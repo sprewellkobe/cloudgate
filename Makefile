@@ -3,7 +3,7 @@
 OUTPUTFILES=cloudgate
 BUILDVERSION=$(shell date +%Y%m%d)
 CFLAGS=-I/usr/include/ -I./ -DBUILDVERSION=$(BUILDVERSION) -DMYDEBUG
-CC=gcc-mp-4.4 -g -Wall -fno-strict-aliasing
+CC=gcc -g -Wall -fno-strict-aliasing
 LIBS=-lcurl
 #---------------------------------------------------------------------------------------------
 
@@ -12,7 +12,7 @@ all: $(OUTPUTFILES)
 .SUFFIXES: .o .c .h
 #---------------------------------------------------------------------------------------------
 
-cloudgate: main.o config.o common.o md5.o mycurl.o
+cloudgate: main.o config.o common.o md5.o mycurl.o cjson.o base64.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 .c.o:

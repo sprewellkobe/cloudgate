@@ -3,15 +3,41 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "common.h"
 #include "config.h"
 #include "mycurl.h"
+#include "cjson.h"
+#include "base64.h"
+//-------------------------------------------------------------------------------------------------
+#define AESENCODE
+
 //-------------------------------------------------------------------------------------------------
 typedef struct Result_s
 {
  char result[16];
  char files[FILE_MAX_NUMBER][64];
+ unsigned short file_count;
+ char* files_content[FILE_MAX_NUMBER];
+ //uint32_t files_length[FILE_MAX_NUMBER];
+ char reason[16];
 }Result;
+//-------------------------------------------------------------------------------------------------
+
+void print_result(Result* result)
+{
+ printf("%s:%s\n",result->result,result->reason);
+ int i=0;
+ for(;i<result->file_count;i++)
+    {
+     if(result->files[i]==NULL)
+        continue;
+     printf("%s:\n",result->files[i]);
+     if(result->files_content[i]!=NULL)
+        printf("[%s]\n",result->files_content[i]);
+    }
+}
 //-------------------------------------------------------------------------------------------------
 
 void display_usage()
@@ -26,25 +52,194 @@ build:\n\
 }
 //-------------------------------------------------------------------------------------------------
 
-int get_files_md5(Config* config,unsigned char* md5)
+void free_result(Result* result)
 {
+ int i=0;
+ for(;i<FILE_MAX_NUMBER;i++)
+    {
+     if(result->files_content[i]!=NULL)
+       {
+        free(result->files_content[i]);
+	result->files_content[i]=NULL;
+       }
+    }
+}
+//-------------------------------------------------------------------------------------------------
+
+int update_local_files(Result* result)
+{
+ int i=0;
+ build_decoding_table();
+ for(;i<result->file_count;i++)
+    {
+     size_t file_length=0;
+     char* content=base64_decode(result->files_content[i],strlen(result->files_content[i]),&file_length);
+     if(write_file(result->files[i],content,file_length)<0)
+       {
+        free(content);
+        break;
+       }
+     free(content);
+    }//end for
+ base64_cleanup();
+ if(i<result->file_count)
+    return -1;
  return 1;
 }
 //-------------------------------------------------------------------------------------------------
 
-int build_post_data(Config* config,char* mac_string,char* md5_string,char* post_data)
+int check_config_build_post_data(Config* config,char* mac_string,char* md5_string,char* post_data)
 {
+ cJSON* root;
+ cJSON* files;
+ cJSON* item;
+ root=cJSON_CreateObject();
+ cJSON_AddStringToObject(root,"apid",mac_string);
+ cJSON_AddStringToObject(root,"checksum",md5_string);
+ cJSON_AddStringToObject(root,"version",config->ap_version);
+ cJSON_AddItemToObject(root,"files",files=cJSON_CreateArray());
+ int i=0;
+ for(;i<config->file_item_count;i++)
+    {
+     cJSON_AddItemToArray(files,item=cJSON_CreateObject());
+     cJSON_AddStringToObject(item,"filename",config->file_items[i].filename);
+     char tmp[64];
+     md52string(config->file_items[i].md5,tmp);
+     cJSON_AddStringToObject(item,"checksum",tmp);
+     sprintf(tmp,"%lu",config->file_items[i].last_modify_time);
+     cJSON_AddStringToObject(item,"timestamp",tmp);
+    }
+ char* out=cJSON_PrintUnformatted(root);
+ #ifdef AESENCODE
+ size_t out_length=strlen(out);
+ char* out2=calloc(out_length*8,sizeof(char));
+ do_aes(out,out2,config->aeskey);
+ free(out);
+ out=out2;
+ #endif
+ strcpy(post_data,out);
+ #ifdef MYDEBUG
+ printf("post_data:[%s]\n",post_data);
+ #endif
+ free(out);
+ cJSON_Delete(root);
+ return 1;
+}
+//-------------------------------------------------------------------------------------------------
+
+int update_server_config_build_post_data(Config* config,char* mac_string,
+                                         Result* result,char* post_data)
+{
+ cJSON* root;
+ cJSON* files;
+ cJSON* item;
+ root=cJSON_CreateObject();
+ cJSON_AddStringToObject(root,"apid",mac_string);
+ cJSON_AddItemToObject(root,"files",files=cJSON_CreateArray());
+ int i=0;
+ for(;i<result->file_count;i++)
+    {
+     cJSON_AddItemToArray(files,item=cJSON_CreateObject());
+     char* filename=result->files[i];
+     cJSON_AddStringToObject(item,"filename",filename);
+
+     size_t file_length;
+     char* content=read_file(filename,&file_length);
+     if(content==NULL)
+        break;
+
+     size_t base64_code_length=0;
+     char* base64_code=base64_encode(content,file_length,&base64_code_length);
+     cJSON_AddStringToObject(item,"filecontent",base64_code);
+     free(base64_code);
+
+     struct stat st;
+     if(stat(filename,&st)!=0)
+       {
+        free(content);
+        break;
+       }
+     char tmp[64];
+     sprintf(tmp,"%lu",st.st_mtime);
+     cJSON_AddStringToObject(item,"timestamp",tmp);
+    
+     unsigned char digest[16];
+     md5(content,content+file_length,digest);
+     md52string(digest,tmp);
+     cJSON_AddStringToObject(item,"checksum",tmp);
+     
+     free(content);    
+    }//end for
+ char* out=cJSON_PrintUnformatted(root);
+ #ifdef AESENCODE
+ size_t out_length=strlen(out);
+ char* out2=calloc(out_length*8,sizeof(char));
+ do_aes(out,out2,config->aeskey);
+ free(out);
+ out=out2;
+ #endif
+ strcpy(post_data,out);
+ #ifdef MYDEBUG
+ printf("post_data:[%s]\n",post_data);
+ #endif
+ free(out);
+ cJSON_Delete(root);
  return 1;
 }
 //-------------------------------------------------------------------------------------------------
 
 int parse_result(char* received,Result* result)
 {
+ memset(result,0,sizeof(Result));
+ cJSON* root=cJSON_Parse(received);
+ if(root==NULL)
+    return -1;
+ cJSON* item;
+ item=cJSON_GetObjectItem(root,"result");
+ if(item==NULL)
+    return -2;
+ strcpy(result->result,item->valuestring);
+ item=NULL;
+ item=cJSON_GetObjectItem(root,"files");
+ if(item!=NULL)
+   {
+    result->file_count=cJSON_GetArraySize(item);
+    int i=0;
+    for(;i<result->file_count;i++)
+       {
+        
+        cJSON* file=cJSON_GetArrayItem(item,i);
+        file=file->child;
+        strcpy(result->files[i],file->string);
+        size_t file_length=strlen(file->valuestring);
+        result->files_content[i]=malloc(file_length+1);
+        strcpy(result->files_content[i],file->valuestring);
+        result->files_content[i][file_length]=0;
+       }
+   }//end if files
+ item=NULL;
+ item=cJSON_GetObjectItem(root,"filenames");
+ if(item==NULL)
+    item=cJSON_GetObjectItem(root,"updated_filenames");
+ if(item!=NULL)
+   {
+    result->file_count=cJSON_GetArraySize(item);
+    int i=0;
+    for(;i<result->file_count;i++)
+       {
+        cJSON* file=cJSON_GetArrayItem(item,i);
+        strcpy(result->files[i],file->valuestring);
+       }
+   }//end if filenames updated_filenames
+ item=NULL;
+ item=cJSON_GetObjectItem(root,"reason");
+ if(item!=NULL)
+    strcpy(result->reason,item->valuestring);
+ cJSON_Delete(root); 
  return 1;
 }
 //-------------------------------------------------------------------------------------------------
 
-//
 int loop_handle(Config* config)
 {
  unsigned char mac[6];
@@ -54,10 +249,10 @@ int loop_handle(Config* config)
     return -1;
    }
  char mac_string[32];
- sprintf(mac_string,"%x:%x:%x:%x:%x:%x",mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+ mac2string(mac,mac_string);
 
  unsigned char md5[16];
- if(get_files_md5(config,md5)<0)
+ if(get_files_md5((void*)config,md5)<0)
    {
     printf("failed to get md5, errno:%d\n",errno);
     return -1;
@@ -68,15 +263,117 @@ int loop_handle(Config* config)
  sprintf(url,"http://%s/check_config?apid=%s&checksum=%s&version=%s",
          config->base_domain,mac_string,md5_string,config->ap_version);
 
- char post_data[4096];
- build_post_data(config,mac_string,md5_string,post_data);
- char received[1024];
+ static char post_data[10240];
+ check_config_build_post_data(config,mac_string,md5_string,post_data);
+ static char received[1024];
  Result result;
+ memset(&result,0,sizeof(result));
  if(do_wget(config,url,post_data,received)==200&&parse_result(received,&result)>0)
    {
-    
-   } 
- return 1; 
+    if(strcmp(result.result,"nothingtodo")==0)//when cloud config == ap config
+      {
+       printf("%lu nothing to do\n",time(NULL));
+       return 2;
+      }
+    if(strcmp(result.result,"apupdate")==0)//when server is newer
+      {
+       if(update_local_files(&result)>0)
+         {
+          printf("%lu ap updated:\n",time(NULL));
+          unsigned short i=0;
+          for(;i<result.file_count;i++)
+              printf("\t%s\n",result.files[i]);
+	 }
+       else
+          printf("%lu ap update file failed, errno:%d\n",time(NULL),errno);
+       free_result(&result);
+       return 3;
+      }
+    if(strcmp(result.result,"serverupdate")==0)//when ap is newer
+      {
+       sprintf(url,"http://%s/update_server_config?apid=%s",config->base_domain,mac_string);
+       update_server_config_build_post_data(config,mac_string,&result,post_data);
+       if(do_wget(config,url,post_data,received)==200&&parse_result(received,&result)>0)
+         {
+	  if(strcmp(result.result,"ok"))
+	    {
+	     printf("%lu server updated:\n",time(NULL));
+	     int i=0;
+	     for(;i<result.file_count;i++)
+	         printf("\t%s\n",result.files[i]);
+	    }
+	  else if(strcmp(result.result,"fail"))
+	    {
+	     printf("%lu server update failed %s\n",time(NULL),result.reason);
+	    }
+	 }
+       free_result(&result);
+       return 4;
+      }
+   }//end if do_wget
+ #ifdef MYDEBUG
+ printf("%lu curl failed\n",time(NULL));
+ #endif
+ return -1; 
+}
+//-------------------------------------------------------------------------------------------------
+
+void test(Config* config)//only for test
+{
+ /*static char rs[81920];
+ int rv=do_wget(&config,"http://www.baidu.com",NULL,rs);
+ printf("%s\n",rs);*/
+ unsigned char md5[16];
+ char md5_string[32];
+ int rv=get_files_md5((void*)config,md5);
+ if(rv<0)
+    printf("md5 failed %d\n",rv);
+ else
+   {
+    md52string(md5,md5_string);
+    printf("[%s]\n",md5_string);
+   }
+
+ unsigned char mac[6];
+ get_mac(mac);
+ char mac_string[32];
+ mac2string(mac,mac_string);
+ char post_data[1024];
+ check_config_build_post_data(config,mac_string,md5_string,post_data);
+
+ /*build_decoding_table();
+ char* input="abc";
+ size_t output_length,output2_length; 
+ char* output=base64_encode(input,strlen(input),&output_length);
+ printf("base64 1:%s\n",output);
+ char* output2=base64_decode(output,output_length,&output2_length);
+ printf("base64 2:%s\n",output2);
+ free(output2);
+ free(output);
+ base64_cleanup();*/
+
+ //char* s="{\"result\":\"ok\",\"updated_filenames\":[\"/etc/hosts\",\"/etc/sample.ini\"]}";
+ char* s="{\"result\":\"apupdate\",\"files\":[{\"/tmp/aaa\":\"YWJj\"},{\"/tmp/bbb\":\"YWJj\"}]}";
+ Result result;
+ rv=parse_result(s,&result);
+ if(rv>0)
+   {
+    print_result(&result);
+    if(strcmp(result.result,"apupdate")==0)
+      {
+       rv=update_local_files(&result);
+       printf("local files updated %d\n",rv);
+      }
+   }
+ else
+    printf("parse failed %d %s\n",rv,s);
+ free_result(&result);
+
+ s="1234";
+ s="{\"ap_id\":\"cc:10:a3:01:32:48\",\"owner_uid\":352575070207589,\"ap_type\":\"HOME\",\"ap_model\":\"NB1210\"}";
+ char out[1024];
+ do_aes(s,out,config->aeskey);
+ printf("::\%s\n",out);
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -96,10 +393,9 @@ int main(int argc,char* argv[])
  #ifdef MYDEBUG
  print_config(config);
  #endif
- 
- static char rs[81920];
- int rv=do_wget(&config,"http://www.baidu.com",NULL,rs);
- printf("%s\n",rs);
+
+ test(&config);
+
  while(0)
       {
        loop_handle(&config);
@@ -107,3 +403,4 @@ int main(int argc,char* argv[])
       }
  return 0;
 }
+//---------------------------------------------------------------------------------------------------

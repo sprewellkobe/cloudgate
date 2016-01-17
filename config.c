@@ -1,8 +1,10 @@
 #include "config.h"
 #include "common.h"
 //-------------------------------------------------------------------------------------------------
+
 int load_config(Config* config,const char* filename)
 {
+ memset(config,0,sizeof(Config));
  FILE* fp=fopen(filename,"r");
  if(fp==NULL)
     return -1;
@@ -33,7 +35,9 @@ int load_config(Config* config,const char* filename)
        else if(strcmp(key,"ap_version")==0)
           sprintf(config->ap_version,"%s",value);
        else if(strcmp(key,"aeskey")==0)
+         {
           sprintf(config->aeskey,"%s",value);
+         }
        else if(strcmp(key,"filename")==0)
           {
            if(fi!=NULL)
@@ -45,7 +49,7 @@ int load_config(Config* config,const char* filename)
            memset(fi,0,sizeof(FileItem));
            if(fi==NULL)
               break;
-           be_string_index=0;
+           be_string_index=-1;
            sprintf(fi->filename,"%s",value);
           }
        else if(strcmp(key,"begin_string")==0)
@@ -54,7 +58,9 @@ int load_config(Config* config,const char* filename)
            strcpy(fi->begin_string[be_string_index],value);
           }
        else if(strcmp(key,"end_string")==0)
+          {
            strcpy(fi->end_string[be_string_index],value);
+	  }
       }//end while
  if(fi)
    {
@@ -69,6 +75,7 @@ int load_config(Config* config,const char* filename)
 
 void print_config(Config config)
 {
+ printf("\n-----begin of config-----\n\n");
  printf("base_domain:%s\nrequest_timeout_seconds:%d\nconnection_timeout_seconds:%d\n\
 check_time_interval:%d\nap_version:%s\naeskey:%s\n", 
          config.base_domain,config.request_timeout_seconds,
@@ -82,9 +89,10 @@ check_time_interval:%d\nap_version:%s\naeskey:%s\n",
      for(;k<FILE_MAX_SECTION;k++)
         {
          if(strlen(config.file_items[i].begin_string[k])>0)
-            printf("%s => %s\n",config.file_items[i].begin_string[k],config.file_items[i].end_string[k]);
+            printf("\t%s => %s\n",config.file_items[i].begin_string[k],config.file_items[i].end_string[k]);
         }//end k
     }//end for i
+ printf("\n-----end of config-----\n");
 }
 //-------------------------------------------------------------------------------------------------
 

@@ -7,25 +7,28 @@
 //-------------------------------------------------------------------------------------------------
 #define FILE_MAX_SECTION 8
 #define FILE_MAX_NUMBER 4
+#define FILE_NAME_MAX_SIZE 128
 
 #define DEFAULT_REQUEST_TIMEOUT_SECONDS 30
 #define DEFAULT_CONNECTION_TIMEOUT_SECONDS 10
 //-------------------------------------------------------------------------------------------------
 typedef struct FileItem_s
 {
- char filename[32];
+ char filename[FILE_NAME_MAX_SIZE];
  char begin_string[FILE_MAX_SECTION][32];
  char end_string[FILE_MAX_SECTION][32];
+ unsigned char md5[16];
+ time_t last_modify_time;
 }FileItem;
 
 typedef struct Config_s
 {
- char base_domain[64];
+ char base_domain[128];
  unsigned short request_timeout_seconds;
  unsigned short connection_timeout_seconds;
  uint32_t check_time_interval;
  char ap_version[16];
- char aeskey[16];
+ char aeskey[32];
  FileItem file_items[FILE_MAX_NUMBER];
  unsigned short file_item_count;
 }Config;

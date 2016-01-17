@@ -29,11 +29,11 @@ int do_wget(Config* config,char* url,char* post_data,char* received)
  curl_easy_setopt(curl_handle,CURLOPT_TIMEOUT,config->request_timeout_seconds);
  curl_easy_setopt(curl_handle,CURLOPT_CONNECTTIMEOUT,config->connection_timeout_seconds);
 
- //if(post_data!=NULL)
+ if(post_data!=NULL)
    {
-    //curl_easy_setopt(curl_handle,CURLOPT_POSTFIELDSIZE,strlen(post_data));
-    //curl_easy_setopt(curl_handle,CURLOPT_POSTFIELDS,post_data);
-    //curl_easy_setopt(curl_handle,CURLOPT_POST,1);
+    curl_easy_setopt(curl_handle,CURLOPT_POSTFIELDSIZE,strlen(post_data));
+    curl_easy_setopt(curl_handle,CURLOPT_POSTFIELDS,post_data);
+    curl_easy_setopt(curl_handle,CURLOPT_POST,1);
    }
  if(received!=NULL)
    {
@@ -49,6 +49,7 @@ int do_wget(Config* config,char* url,char* post_data,char* received)
  int rc=200;
  curl_easy_getinfo(curl_handle,CURLINFO_RESPONSE_CODE,&rc);
  curl_easy_cleanup(curl_handle);
+ curl_global_cleanup();
  return rc;
 }
 //-------------------------------------------------------------------------------------------------
