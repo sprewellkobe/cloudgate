@@ -6,9 +6,13 @@
 #include "config.h"
 #include "base64.h"
 #include <openssl/aes.h>
+#include <openssl/evp.h>
+#include <openssl/crypto.h>
 //-------------------------------------------------------------------------------------------------
 static unsigned char old_md5[16];
 static FileItem old_file_items[FILE_MAX_NUMBER];
+const unsigned char AES_IV_PADDING_CHAR='X';
+const char* CIPHER_NAME="aes-128-cbc";
 //-------------------------------------------------------------------------------------------------
 
 char* trim(char* s)
@@ -192,37 +196,107 @@ int get_files_md5(void* config_,unsigned char* md)
 }
 //-------------------------------------------------------------------------------------------------
 
-void do_aes(char* in,char* out,char* key)
+void write_to_hex(char* in,size_t in_length,char* out)
 {
- char aes_key[16];
- memset(aes_key,0,16);
- strncpy(aes_key,key,16);
- AES_KEY enc_key;
- AES_set_encrypt_key((unsigned char*)aes_key,sizeof(aes_key)*8,&enc_key);
-
- unsigned char ivec[AES_BLOCK_SIZE];
- memset(ivec,0,sizeof(ivec));
- char* new_in=NULL;
- char* new_out=NULL;
- size_t new_length=0;
- 
- size_t length=strlen(in);
- new_length=length;
- if(new_length%AES_BLOCK_SIZE!=0)
-    new_length=((length/AES_BLOCK_SIZE)+1)*AES_BLOCK_SIZE;
- new_in=calloc(new_length+1,sizeof(char));
- memcpy(new_in,in,length);
- new_out=calloc(new_length+1,sizeof(char));
- 
- AES_cbc_encrypt((unsigned char *)new_in,(unsigned char *)new_out, 
-                 new_length,&enc_key,ivec,AES_ENCRYPT);
  int i=0;
- for(;i<new_length;i++)
-    {
-     //printf("%02X ",new_out[i]&0xFF);
-     out=out+sprintf(out,"%02X",new_out[i]&0xFF);
-    }
- free(new_in);
- free(new_out); 
+ for(;i<in_length;i++) out=out+sprintf(out,"%02X",in[i]&0xFF); 
+}
+//-------------------------------------------------------------------------------------------------
+
+void read_from_hex(char* in,char* out,size_t* out_length)
+{
+ int p=0;
+ int i=0;
+ while(in[p]!=0)
+      {
+       unsigned int t=0;
+       sscanf(in+p,"%02X",&t);
+       out[i++]=(unsigned char)t;
+       p+=2;
+      }//end while
+ out[i]=0;
+ *out_length=i;
+}
+//-------------------------------------------------------------------------------------------------
+
+int do_aes_encrypt(char* in,char* out,char* key_)
+{
+ unsigned char iv[AES_BLOCK_SIZE];
+ memset(iv,AES_IV_PADDING_CHAR,sizeof(iv));
+ size_t in_length=strlen(in);
+ size_t new_out_length=in_length+AES_BLOCK_SIZE;
+ char* new_out=calloc(new_out_length+1,1);
+ OpenSSL_add_all_algorithms();
+ const EVP_CIPHER* cipher_type=EVP_get_cipherbyname(CIPHER_NAME);
+ if(cipher_type==NULL)
+    return -1;
+ int key_length=EVP_CIPHER_key_length(cipher_type);
+ unsigned char* key=NULL;
+ if(key_length>strlen(key_)) 
+   {
+    key=calloc(key_length,1);
+    memcpy(key,key_,strlen(key_));
+   }
+ else
+    key=(unsigned char*)key_;
+ EVP_CIPHER_CTX cipher_ctx;
+ EVP_EncryptInit(&cipher_ctx,cipher_type,NULL,NULL);
+ if(strlen(key_)>key_length)
+    EVP_CIPHER_CTX_set_key_length(&cipher_ctx,strlen(key_));
+ EVP_EncryptInit_ex(&cipher_ctx,NULL,NULL,key,iv);
+ int m;
+ EVP_EncryptUpdate(&cipher_ctx,(unsigned char*)new_out,&m,(unsigned char*)in,in_length);
+ new_out_length=m;
+ if(EVP_EncryptFinal(&cipher_ctx,(unsigned char *)new_out+m,&m))
+   {
+    new_out_length+=m;
+    new_out[new_out_length]=0;
+   }
+ if((char*)key!=key_) free(key);
+ EVP_CIPHER_CTX_cleanup(&cipher_ctx);
+ write_to_hex(new_out,new_out_length,out);
+ free(new_out);
+ return 1;
+}
+//-------------------------------------------------------------------------------------------------
+
+int do_aes_decrypt(char* in_,char* out,char* key_)
+{
+ unsigned char iv[AES_BLOCK_SIZE];
+ memset(iv,AES_IV_PADDING_CHAR,sizeof(iv));
+ size_t in_length=0;
+ char* in=calloc((strlen(in_)+1)/2+1,1);
+ read_from_hex(in_,in,&in_length);
+ size_t out_length=0;
+
+ OpenSSL_add_all_algorithms();
+ const EVP_CIPHER* cipher_type=EVP_get_cipherbyname(CIPHER_NAME);
+ if(cipher_type==NULL)
+    return -1;
+ int key_length=EVP_CIPHER_key_length(cipher_type);
+ unsigned char* key=NULL;
+ if(key_length>strlen(key_))
+   {
+    key=calloc(key_length,1);
+    memcpy(key,key_,strlen(key_));
+   }
+ else
+    key=(unsigned char*)key_;
+ EVP_CIPHER_CTX cipher_ctx;
+ EVP_DecryptInit(&cipher_ctx,cipher_type,NULL,NULL);
+ if(strlen(key_)>key_length)
+    EVP_CIPHER_CTX_set_key_length(&cipher_ctx,strlen(key_));
+ EVP_DecryptInit_ex(&cipher_ctx,NULL,NULL,key,iv);
+ int m=0;
+ EVP_DecryptUpdate(&cipher_ctx,(unsigned char*)out,&m,(unsigned char *)in,in_length);
+ if(EVP_DecryptFinal(&cipher_ctx,(unsigned char *)out+m,&m)) 
+   {
+    out_length+=m;
+    out[out_length]=0;
+   }
+ if((char*)key!=key_) free(key);
+ EVP_CIPHER_CTX_cleanup(&cipher_ctx);
+ free(in);
+ return 1;
 }
 //-------------------------------------------------------------------------------------------------

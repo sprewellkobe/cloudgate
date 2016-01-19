@@ -113,7 +113,7 @@ int check_config_build_post_data(Config* config,char* mac_string,char* md5_strin
  #ifdef AESENCODE
  size_t out_length=strlen(out);
  char* out2=calloc(out_length*8,sizeof(char));
- do_aes(out,out2,config->aeskey);
+ do_aes_encrypt(out,out2,config->aeskey);
  free(out);
  out=out2;
  #endif
@@ -174,7 +174,7 @@ int update_server_config_build_post_data(Config* config,char* mac_string,
  #ifdef AESENCODE
  size_t out_length=strlen(out);
  char* out2=calloc(out_length*8,sizeof(char));
- do_aes(out,out2,config->aeskey);
+ do_aes_encrypt(out,out2,config->aeskey);
  free(out);
  out=out2;
  #endif
@@ -369,11 +369,29 @@ void test(Config* config)//only for test
     printf("parse failed %d %s\n",rv,s);
  free_result(&result);
 
- s="1234";
- s="{\"ap_id\":\"cc:10:a3:01:32:48\",\"owner_uid\":352575070207589,\"ap_type\":\"HOME\",\"ap_model\":\"NB1210\"}";
+ s="abc";
  char out[1024];
- do_aes(s,out,config->aeskey);
- printf("::\%s\n",out);
+ int rt=do_aes_encrypt(s,out,config->aeskey);
+ if(rt>0)
+    printf(":>:\%s\n",out);
+ else
+    printf("failed %d\n",rt);
+
+ char out2[1024];
+ rt=do_aes_decrypt(out,out2,config->aeskey);
+ if(rt>0)
+    printf(":<:\%s\n",out2);
+ else
+    printf("failed %d\n",rt); 
+ /*
+ s="abcd";
+ char out2[16];
+ write_to_hex(s,strlen(s),out2);
+ char out3[16];
+ size_t out3_length=0;
+ read_from_hex(out2,out3,&out3_length);
+ printf("out3:%s\n",out3);
+ */
 }
 //-------------------------------------------------------------------------------------------------
 

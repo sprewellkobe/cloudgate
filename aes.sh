@@ -1,1 +1,1 @@
-openssl enc -aes-128-cbc -in 1234.txt -k kisslinkkisslink -iv 0 -p -nosalt -a
+openssl enc -aes-256-cbc -in in.txt -k kisslinkkisslink -iv 0 -nosalt > out.txt
