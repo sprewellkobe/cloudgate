@@ -10,6 +10,7 @@
 #include <openssl/crypto.h>
 //-------------------------------------------------------------------------------------------------
 static unsigned char old_md5[16];
+static time_t old_md5_timestamp;
 static FileItem old_file_items[FILE_MAX_NUMBER];
 const unsigned char AES_IV_PADDING_CHAR='X';
 const char* CIPHER_NAME="aes-128-cbc";
@@ -23,9 +24,13 @@ char* trim(char* s)
  if(l==0)
     return s;
  char* e=s+l-1;
- while(*s!=0&&(*s==' '||*s=='\t'||*s=='\n'||*s=='\r'))
+ while(*s!=0&&
+       (*s==' '||*s=='\t'||*s=='\n'||*s=='\r'||*s=='\''||*s=='"')
+      )
        s++;
- while(e>s&&(*e==' '||*e=='\t'||*e=='\n'||*e=='\r'))
+ while(e>s&&
+       (*e==' '||*e=='\t'||*e=='\n'||*e=='\r'||*e=='\''||*e=='"')
+      )
       {
        *e=0;
        e--;
@@ -126,7 +131,10 @@ int get_files_md5(void* config_,unsigned char* md)
  if((old_md5[0]!=0&&old_md5[1]!=0&&old_md5[2]!=0&&old_md5[3]!=0&&
      old_md5[4]!=0&&old_md5[5]!=0&&old_md5[6]!=0&&old_md5[7]!=0)
     &&
-    time(NULL)-biggest_last_access_time>config->check_time_interval*2)
+    time(NULL)-biggest_last_access_time>config->check_time_interval*2
+    &&
+    (old_md5_timestamp>1000000&&(time(NULL)-old_md5_timestamp)<FILES_MD5_EXPIRE_TIME)
+   )
     //if files not modify recently, then return old md5
    {
     #ifdef MYDEBUG
@@ -192,12 +200,13 @@ int get_files_md5(void* config_,unsigned char* md)
  for(;i<config->file_item_count;i++)
     {
      char* p2=md52string(config->file_items[i].md5,p);
-     printf("{%s}\n",p);
+     //printf("{%s}\n",p);
      p=p2;
     }
  md5(buffer,p,md);
  memcpy(old_md5,md,sizeof(md));
  memcpy(old_file_items,config->file_items,sizeof(config->file_items));
+ old_md5_timestamp=time(NULL);
  return 1;
 }
 //-------------------------------------------------------------------------------------------------

@@ -61,6 +61,10 @@ int load_config(Config* config,const char* filename)
           {
            strcpy(fi->end_string[be_string_index],value);
 	  }
+       else if(strcmp(key,"trigger_command")==0)
+          {
+           strcpy(fi->trigger_command,value);
+          }
       }//end while
  if(fi)
    {
@@ -84,7 +88,8 @@ check_time_interval:%d\nap_version:%s\naeskey:%s\n",
  int i=0;
  for(;i<config.file_item_count;i++)
     {
-     printf("%s:\n",config.file_items[i].filename);
+     printf("%s,%s:\n",config.file_items[i].filename,
+                       config.file_items[i].trigger_command);
      int k=0;
      for(;k<FILE_MAX_SECTION;k++)
         {

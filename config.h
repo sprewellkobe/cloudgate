@@ -5,9 +5,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 //-------------------------------------------------------------------------------------------------
-#define FILE_MAX_SECTION 8
-#define FILE_MAX_NUMBER 4
+#define FILE_MAX_SECTION 1
+#define FILE_MAX_NUMBER 8
 #define FILE_NAME_MAX_SIZE 128
+#define TRIGGER_COMMAND_MAX_SIZE 64
 
 #define DEFAULT_REQUEST_TIMEOUT_SECONDS 30
 #define DEFAULT_CONNECTION_TIMEOUT_SECONDS 10
@@ -19,11 +20,12 @@ typedef struct FileItem_s
  char end_string[FILE_MAX_SECTION][32];
  unsigned char md5[16];
  time_t last_modify_time;
+ char trigger_command[TRIGGER_COMMAND_MAX_SIZE];
 }FileItem;
 
 typedef struct Config_s
 {
- char base_domain[128];
+ char base_domain[64];
  unsigned short request_timeout_seconds;
  unsigned short connection_timeout_seconds;
  uint32_t check_time_interval;

@@ -12,6 +12,8 @@
 #include "base64.h"
 //-------------------------------------------------------------------------------------------------
 #define AESENCODE
+#define POST_DATA_MAX_SIZE 64*1024
+#define RECEIVE_DATA_MAX_SIZE 64*1024
 //-------------------------------------------------------------------------------------------------
 typedef struct Result_s
 {
@@ -64,7 +66,7 @@ void free_result(Result* result)
 }
 //-------------------------------------------------------------------------------------------------
 
-int update_local_files(Result* result)
+int update_local_files(Config* config,Result* result)
 {
  int i=0;
  build_decoding_table();
@@ -78,7 +80,20 @@ int update_local_files(Result* result)
         break;
        }
      free(content);
-    }//end for
+     int k=0;
+     for(;k<config->file_item_count;k++)
+        {
+         if(strcmp(config->file_items[k].filename,result->files[i])==0&&
+            strlen(config->file_items[k].trigger_command)>0)
+           {
+            system(config->file_items[k].trigger_command);
+            #ifdef MYDEBUG
+            printf("triggered %s\n",config->file_items[k].trigger_command);
+            #endif
+            break;
+           }
+        }//end for k
+    }//end for i
  base64_cleanup();
  if(i<result->file_count)
     return -1;
@@ -261,9 +276,9 @@ int loop_handle(Config* config)
  sprintf(url,"http://%s/check_config?apid=%s&checksum=%s&version=%s",
          config->base_domain,mac_string,md5_string,config->ap_version);
 
- static char post_data[1024*64];
+ static char post_data[POST_DATA_MAX_SIZE];
  check_config_build_post_data(config,mac_string,md5_string,post_data);
- static char received[1024*64];
+ static char received[RECEIVE_DATA_MAX_SIZE];
  Result result;
  memset(&result,0,sizeof(result));
  int rc=-99;
@@ -277,7 +292,7 @@ int loop_handle(Config* config)
       }
     if(strcmp(result.result,"apupdate")==0)//when server is newer
       {
-       if(update_local_files(&result)>0)
+       if(update_local_files(config,&result)>0)
          {
           printf("%lu ap updated:\n",time(NULL));
           unsigned short i=0;
@@ -326,6 +341,7 @@ int loop_handle(Config* config)
 
 void test(Config* config)//only for test
 {
+ /*
  unsigned char md5[16];
  char md5_string[32];
  int rv=get_files_md5((void*)config,md5);
@@ -343,6 +359,10 @@ void test(Config* config)//only for test
  mac2string(mac,mac_string);
  char post_data[1024];
  check_config_build_post_data(config,mac_string,md5_string,post_data);
+ */
+ char s[16]="\"\"";
+ char* ss=trim(s);
+ printf("trim:%s\n",ss); 
 
  /*build_decoding_table();
  char* input="abc";
@@ -354,8 +374,7 @@ void test(Config* config)//only for test
  free(output2);
  free(output);
  base64_cleanup();*/
-
- //char* s="{\"result\":\"ok\",\"updated_filenames\":[\"/etc/hosts\",\"/etc/sample.ini\"]}";
+ /*
  char* s="{\"result\":\"apupdate\",\"files\":[{\"/tmp/aaa\":\"YWJj\"},{\"/tmp/bbb\":\"YWJj\"}]}";
  Result result;
  rv=parse_result(s,&result);
@@ -364,7 +383,7 @@ void test(Config* config)//only for test
     print_result(&result);
     if(strcmp(result.result,"apupdate")==0)
       {
-       rv=update_local_files(&result);
+       rv=update_local_files(config,&result);
        printf("local files updated %d\n",rv);
       }
    }
@@ -385,7 +404,7 @@ void test(Config* config)//only for test
  if(rt>0)
     printf(":<:\%s\n",out2);
  else
-    printf("failed %d\n",rt); 
+    printf("failed %d\n",rt);*/
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -396,7 +415,6 @@ int main(int argc,char* argv[])
     display_usage();
     return 0;
    }
- curl_global_init(CURL_GLOBAL_DEFAULT);
  Config config;
  if(load_config(&config,argv[1])<0)
    {
@@ -414,7 +432,6 @@ int main(int argc,char* argv[])
        loop_handle(&config);
        sleep(config.check_time_interval);
       }
- curl_global_cleanup();
  return 0;
 }
 //---------------------------------------------------------------------------------------------------
