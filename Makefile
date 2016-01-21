@@ -2,7 +2,7 @@
 #---------------------------------------------------------------------------------------------
 OUTPUTFILES=cloudgate
 BUILDVERSION=$(shell date +%Y%m%d)
-CFLAGS=-I/usr/include/ -I./ -DBUILDVERSION=$(BUILDVERSION) -DMYDEBUG
+CFLAGS=-I/usr/include/ -I./ -L/usr/local/lib -DBUILDVERSION=$(BUILDVERSION) -DMYDEBUG
 CC=gcc -g -Wall -fno-strict-aliasing
 LIBS=-lcurl
 #---------------------------------------------------------------------------------------------

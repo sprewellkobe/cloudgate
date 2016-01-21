@@ -7,7 +7,7 @@ function strtohex($x)
 } 
 
 $AES_PADDING_CHAR='X';
-$source='123456781234567';
+$source='1234567812345678';
 $iv=str_repeat($AES_PADDING_CHAR,16);
     
 $key='kisslinkkisslink';

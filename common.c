@@ -129,10 +129,16 @@ int get_files_md5(void* config_,unsigned char* md)
     time(NULL)-biggest_last_access_time>config->check_time_interval*2)
     //if files not modify recently, then return old md5
    {
+    #ifdef MYDEBUG
+    printf("cache hitted\n");
+    #endif
     memcpy(md,old_md5,sizeof(old_md5));
     memcpy(config->file_items,old_file_items,sizeof(old_file_items));
     return 1;
    }
+ #ifdef MYDEBUG
+ printf("real caculate\n");
+ #endif
  i=0;
  for(;i<config->file_item_count;i++)
     {

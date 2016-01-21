@@ -19,12 +19,17 @@ int write_function(void* ptr,size_t size,size_t nmemb,void* stream)
 
 int do_wget(Config* config,char* url,char* post_data,char* received)
 {
+ curl_global_init(CURL_GLOBAL_DEFAULT);
+ long rc=200;
  received_index=0;
  CURL *curl_handle=NULL;
  CURLcode rv=0;
  curl_handle=curl_easy_init();
  if(curl_handle==NULL)
+   {
+    curl_global_cleanup();
     return -1;
+   }
  curl_easy_setopt(curl_handle,CURLOPT_URL,url);
  curl_easy_setopt(curl_handle,CURLOPT_TIMEOUT,config->request_timeout_seconds);
  curl_easy_setopt(curl_handle,CURLOPT_CONNECTTIMEOUT,config->connection_timeout_seconds);
@@ -44,12 +49,12 @@ int do_wget(Config* config,char* url,char* post_data,char* received)
  if(rv!=CURLE_OK)
    {
     curl_easy_cleanup(curl_handle);
+    curl_global_cleanup();
     return -2;
    }
- int rc=200;
  curl_easy_getinfo(curl_handle,CURLINFO_RESPONSE_CODE,&rc);
  curl_easy_cleanup(curl_handle);
  curl_global_cleanup();
- return rc;
+ return (int)(rc);
 }
 //-------------------------------------------------------------------------------------------------

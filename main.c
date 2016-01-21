@@ -12,7 +12,6 @@
 #include "base64.h"
 //-------------------------------------------------------------------------------------------------
 #define AESENCODE
-
 //-------------------------------------------------------------------------------------------------
 typedef struct Result_s
 {
@@ -20,7 +19,6 @@ typedef struct Result_s
  char files[FILE_MAX_NUMBER][64];
  unsigned short file_count;
  char* files_content[FILE_MAX_NUMBER];
- //uint32_t files_length[FILE_MAX_NUMBER];
  char reason[16];
 }Result;
 //-------------------------------------------------------------------------------------------------
@@ -143,7 +141,7 @@ int update_server_config_build_post_data(Config* config,char* mac_string,
      char* filename=result->files[i];
      cJSON_AddStringToObject(item,"filename",filename);
 
-     size_t file_length;
+     size_t file_length=0;
      char* content=read_file(filename,&file_length);
      if(content==NULL)
         break;
@@ -263,12 +261,14 @@ int loop_handle(Config* config)
  sprintf(url,"http://%s/check_config?apid=%s&checksum=%s&version=%s",
          config->base_domain,mac_string,md5_string,config->ap_version);
 
- static char post_data[10240];
+ static char post_data[1024*64];
  check_config_build_post_data(config,mac_string,md5_string,post_data);
- static char received[1024];
+ static char received[1024*64];
  Result result;
  memset(&result,0,sizeof(result));
- if(do_wget(config,url,post_data,received)==200&&parse_result(received,&result)>0)
+ int rc=-99;
+ int pc=0;
+ if((rc=do_wget(config,url,post_data,received))==200&&(pc=parse_result(received,&result))>0)
    {
     if(strcmp(result.result,"nothingtodo")==0)//when cloud config == ap config
       {
@@ -293,26 +293,32 @@ int loop_handle(Config* config)
       {
        sprintf(url,"http://%s/update_server_config?apid=%s",config->base_domain,mac_string);
        update_server_config_build_post_data(config,mac_string,&result,post_data);
-       if(do_wget(config,url,post_data,received)==200&&parse_result(received,&result)>0)
+       if((rc=do_wget(config,url,post_data,received))==200&&
+          (pc=parse_result(received,&result))>0)
          {
-	  if(strcmp(result.result,"ok"))
+	  if(strcmp(result.result,"ok")==0)
 	    {
 	     printf("%lu server updated:\n",time(NULL));
 	     int i=0;
 	     for(;i<result.file_count;i++)
 	         printf("\t%s\n",result.files[i]);
 	    }
-	  else if(strcmp(result.result,"fail"))
+	  else if(strcmp(result.result,"fail")==0)
 	    {
-	     printf("%lu server update failed %s\n",time(NULL),result.reason);
+	     printf("%lu server update failed1 %s\n",time(NULL),result.reason);
 	    }
 	 }
+       else
+          printf("%lu server update failed2 %d\n",time(NULL),rc);
        free_result(&result);
        return 4;
       }
    }//end if do_wget
  #ifdef MYDEBUG
- printf("%lu curl failed\n",time(NULL));
+ if(pc<0)
+    printf("%lu failed to parse %s\n",time(NULL),received);
+ else
+    printf("%lu curl failed %d %s\n",time(NULL),rc,url);
  #endif
  return -1; 
 }
@@ -320,9 +326,6 @@ int loop_handle(Config* config)
 
 void test(Config* config)//only for test
 {
- /*static char rs[81920];
- int rv=do_wget(&config,"http://www.baidu.com",NULL,rs);
- printf("%s\n",rs);*/
  unsigned char md5[16];
  char md5_string[32];
  int rv=get_files_md5((void*)config,md5);
@@ -383,15 +386,6 @@ void test(Config* config)//only for test
     printf(":<:\%s\n",out2);
  else
     printf("failed %d\n",rt); 
- /*
- s="abcd";
- char out2[16];
- write_to_hex(s,strlen(s),out2);
- char out3[16];
- size_t out3_length=0;
- read_from_hex(out2,out3,&out3_length);
- printf("out3:%s\n",out3);
- */
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -402,6 +396,7 @@ int main(int argc,char* argv[])
     display_usage();
     return 0;
    }
+ curl_global_init(CURL_GLOBAL_DEFAULT);
  Config config;
  if(load_config(&config,argv[1])<0)
    {
@@ -412,13 +407,14 @@ int main(int argc,char* argv[])
  print_config(config);
  #endif
 
- test(&config);
-
- while(0)
+ //test(&config);
+ int i=0;
+ while(i++<3)
       {
        loop_handle(&config);
        sleep(config.check_time_interval);
       }
+ curl_global_cleanup();
  return 0;
 }
 //---------------------------------------------------------------------------------------------------
