@@ -3,7 +3,7 @@
 static unsigned int received_index=0;
 //-------------------------------------------------------------------------------------------------
 
-int write_function(void* ptr,size_t size,size_t nmemb,void* stream)
+size_t write_function(char* ptr,size_t size,size_t nmemb,void* stream)
 {
  size_t irsize=size*nmemb;
  char* s=(char*)stream;
@@ -43,7 +43,7 @@ int do_wget(Config* config,char* url,char* post_data,char* received)
  if(received!=NULL)
    {
     curl_easy_setopt(curl_handle,CURLOPT_WRITEDATA,(void *)received);
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION,write_function);
+    curl_easy_setopt(curl_handle,CURLOPT_WRITEFUNCTION,write_function);
    }
  rv=curl_easy_perform(curl_handle);
  if(rv!=CURLE_OK)
