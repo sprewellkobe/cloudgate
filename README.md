@@ -1,5 +1,11 @@
-# cloudgate
-connect with cloud, and do update if needed
+#cloudgate
+connect with cloud and report md5 of local config files to the cloud
+
+if cloud's version is newer than local, update local config files
+
+otherwise, upload the newer local config files to cloud server
+
+##how to use
 
 usage:
     ./cloudgate cloudgate.ini
@@ -33,3 +39,5 @@ cloudgate.ini example:
 
     filename=/etc/hosts
     filename=/data/myservice.conf
+
+#how it works
