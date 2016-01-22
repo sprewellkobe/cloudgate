@@ -41,3 +41,18 @@ cloudgate.ini example:
     filename=/data/myservice.conf
 
 #how it works
+
+    while(true)
+         {
+          compare local_config with cloud_config
+          if(local_config == cloud_config)
+             continue
+          if(cloud_config newer than local_config)
+             local_config=cloud_config
+          else
+            {
+             upload local_config to cloud
+             cloud_config=local_config
+            }
+          sleep
+         }
