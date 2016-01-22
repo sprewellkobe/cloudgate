@@ -56,3 +56,5 @@ cloudgate.ini example:
             }
           sleep
          }
+         
+API: http://kisswiki.sinaapp.com/debug.kisslink.com接口
