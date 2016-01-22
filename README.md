@@ -5,7 +5,8 @@ usage:
     ./cloudgate cloudgate.ini
 
 cloudgate.ini example:
-<code>
+
+<p><code>
 [CLOUD]
 #comment
 #cloud api domain
@@ -33,4 +34,4 @@ trigger_command="service xxx restart"
 
 filename=/etc/hosts
 filename=/data/myservice.conf
-</code>
+</code></p>
