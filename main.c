@@ -152,6 +152,7 @@ int update_server_config_build_post_data(Config* config,char* mac_string,
  cJSON* item;
  root=cJSON_CreateObject();
  cJSON_AddStringToObject(root,"apid",mac_string);
+ cJSON_AddStringToObject(root,"version",config->ap_version);
  cJSON_AddItemToObject(root,"files",files=cJSON_CreateArray());
  int i=0;
  for(;i<result->file_count;i++)
@@ -176,12 +177,11 @@ int update_server_config_build_post_data(Config* config,char* mac_string,
         free(content);
         break;
        }
-     char tmp[64];
-     sprintf(tmp,"%lu",st.st_mtime);
-     cJSON_AddStringToObject(item,"timestamp",tmp);
+     cJSON_AddNumberToObject(item,"timestamp",st.st_mtime);
     
      unsigned char digest[16];
      md5(content,content+file_length,digest);
+     char tmp[64];
      md52string(digest,tmp);
      cJSON_AddStringToObject(item,"checksum",tmp);
      
@@ -296,7 +296,9 @@ int loop_handle(Config* config)
     return -1;
    }
  #ifdef AESENCODE
+ #ifdef MYDEBUG
  printf("received:%s\n",received);
+ #endif
  char* tmp=malloc(RECEIVE_DATA_MAX_SIZE);
  do_aes_decrypt(received,tmp,config->aeskey);
  sprintf(received,"%s",tmp);
@@ -331,23 +333,42 @@ int loop_handle(Config* config)
    {
     sprintf(url,"http://%s/update_server_config?apid=%s",config->base_domain,mac_string);
     update_server_config_build_post_data(config,mac_string,&result,post_data);
-    if((rc=do_wget(config,url,post_data,received))==200&&
-       (pc=parse_result(received,&result))>0)
+    if((rc=do_wget(config,url,post_data,received))!=200)
       {
-       if(strcmp(result.result,"ok")==0)
-	 {
-	     printf("%lu server updated:\n",time(NULL));
-	     int i=0;
-	     for(;i<result.file_count;i++)
-	         printf("\t%s\n",result.files[i]);
-	 }
-       else if(strcmp(result.result,"fail")==0)
-	 {
-	  printf("%lu server update failed1 %s\n",time(NULL),result.reason);
-	 }
+       printf("%lu server update failed2 %d\n",time(NULL),rc);
+       free_result(&result);
+       return -5;
+      }
+    #ifdef AESENCODE
+    #ifdef MYDEBUG
+    printf("received:%s\n",received);
+    #endif
+    char* tmp=malloc(RECEIVE_DATA_MAX_SIZE);
+    do_aes_decrypt(received,tmp,config->aeskey);
+    sprintf(received,"%s",tmp);
+    free(tmp);
+    #endif
+    if((pc=parse_result(received,&result))<0)
+      {
+       #ifdef MYDEBUG
+       printf("%lu failed to parse2 %s\n",time(NULL),received);
+       free_result(&result);
+       return -6;
+       #endif
+      }
+    if(strcmp(result.result,"ok")==0)
+      {
+       printf("%lu server updated:\n",time(NULL));
+       int i=0;
+       for(;i<result.file_count;i++)
+	   printf("\t%s\n",result.files[i]);
+      }
+    else if(strcmp(result.result,"fail")==0)
+      {
+       printf("%lu server update failed1 %s\n",time(NULL),result.reason);
       }
     else
-       printf("%lu server update failed2 %d\n",time(NULL),rc);
+       printf("%lu server update failed3\n",time(NULL));
     free_result(&result);
     return 4;
    }
@@ -440,7 +461,7 @@ int main(int argc,char* argv[])
 
  //test(&config);
  int i=0;
- while(i++<30)
+ while(i++<20)
       {
        loop_handle(&config);
        sleep(config.check_time_interval);
