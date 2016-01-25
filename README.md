@@ -24,7 +24,7 @@ cloudgate.ini example:
     #how offen connect to cloud
     check_time_interval=3
     #ap version number
-    ap_version=1210
+    ap_version=NBOS-1.0.3.1507
     #aeskey to encrypt post data
     aeskey=kisslinkkisslink
 
