@@ -304,6 +304,9 @@ int loop_handle(Config* config)
  sprintf(received,"%s",tmp);
  free(tmp);
  #endif 
+ #ifdef MYDEBUG
+ printf("received2:%s\n",received);
+ #endif
  if((pc=parse_result(received,&result))<0)
    {
     #ifdef MYDEBUG
@@ -461,7 +464,7 @@ int main(int argc,char* argv[])
 
  //test(&config);
  int i=0;
- while(i++<20)
+ while(1<20)
       {
        loop_handle(&config);
        sleep(config.check_time_interval);
