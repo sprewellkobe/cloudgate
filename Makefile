@@ -4,7 +4,7 @@ TARGET=cloudgate
 BUILDVERSION=$(shell date +%Y%m%d)
 
 CC=$(TOOLPREFIX)gcc
-DEF=-DBUILDVERSION=$(BUILDVERSION) -DMYDEBUG
+DEF=-DBUILDVERSION=$(BUILDVERSION) #-DMYDEBUG
 CFLAGS=-g -O2 -Wall -fno-strict-aliasing $(DEF)
 INCPATH=-I/usr/include/ -I./
 LDPATH=

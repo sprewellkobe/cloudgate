@@ -5,8 +5,6 @@
 #include <time.h>
 #include <stdint.h>
 //-------------------------------------------------------------------------------------------------
-#define FILES_MD5_EXPIRE_TIME 90000
-//-------------------------------------------------------------------------------------------------
 char* trim(char* s);
 void md5(char* from,char* to,unsigned char* p);
 char* md52string(unsigned char* m,char* string);

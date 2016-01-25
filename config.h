@@ -9,9 +9,16 @@
 #define FILE_MAX_NUMBER 8
 #define FILE_NAME_MAX_SIZE 128
 #define TRIGGER_COMMAND_MAX_SIZE 64
-
 #define DEFAULT_REQUEST_TIMEOUT_SECONDS 30
 #define DEFAULT_CONNECTION_TIMEOUT_SECONDS 10
+
+#define FILES_MD5_EXPIRE_TIME 90000
+
+#define AESENCODE
+#define POST_DATA_MAX_SIZE 128*1024
+#define RECEIVE_DATA_MAX_SIZE 128*1024
+
+#define RELOAD_CONFIG "/tmp/cloudgate_reload_config"
 //-------------------------------------------------------------------------------------------------
 typedef struct FileItem_s
 {

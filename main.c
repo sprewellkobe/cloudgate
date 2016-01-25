@@ -11,10 +11,6 @@
 #include "cjson.h"
 #include "base64.h"
 //-------------------------------------------------------------------------------------------------
-#define AESENCODE
-#define POST_DATA_MAX_SIZE 64*1024
-#define RECEIVE_DATA_MAX_SIZE 64*1024
-//-------------------------------------------------------------------------------------------------
 typedef struct Result_s
 {
  char result[16];
@@ -466,6 +462,21 @@ int main(int argc,char* argv[])
  int i=0;
  while(1<20)
       {
+       i=0;
+       struct stat st;
+       if(stat((char*)RELOAD_CONFIG,&st)==0)
+         {
+          Config tc;
+          if(load_config(&tc,argv[1])>0)
+            {
+             memcpy(&config,&tc,sizeof(config));
+             printf("%lu config reloaded\n",time(NULL));
+             #ifdef MYDEBUG
+             print_config(config);
+             #endif
+            }
+          unlink(RELOAD_CONFIG);
+         } 
        loop_handle(&config);
        sleep(config.check_time_interval);
       }
