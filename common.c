@@ -1,13 +1,16 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <sys/un.h> 
+#include <errno.h>
+#include <openssl/aes.h>
+#include <openssl/evp.h>
+#include <openssl/crypto.h>
 #include "common.h"
 #include "md5.h"
 #include "config.h"
 #include "base64.h"
-#include <openssl/aes.h>
-#include <openssl/evp.h>
-#include <openssl/crypto.h>
 //-------------------------------------------------------------------------------------------------
 static unsigned char old_md5[16];
 static time_t old_md5_timestamp;
@@ -320,5 +323,26 @@ int do_aes_decrypt(char* in_,char* out,char* key_)
  EVP_CIPHER_CTX_cleanup(&cipher_ctx);
  free(in);
  return 1;
+}
+//-------------------------------------------------------------------------------------------------
+
+int send_message_to_unix_socket(char* socket_name,char* message,size_t length)
+{
+ int sockfd;
+ struct sockaddr_un ApiName;
+ int ret;
+ if((sockfd=socket(AF_UNIX,SOCK_DGRAM,0))==-1)
+   {
+    printf("%lu\tfailed to create unix socket %d\n",time(NULL),errno);
+    return -1;
+   }
+ memset (&ApiName, 0, sizeof(struct sockaddr_un));
+ ApiName.sun_family = AF_UNIX;
+ snprintf(ApiName.sun_path,sizeof(ApiName.sun_path),socket_name);
+ ret=sendto(sockfd,message,length,0,(struct sockaddr *)&ApiName,sizeof(ApiName));
+ if(ret<0)
+    printf("%lu\tfailed to sendto %s\n",time(NULL),socket_name);
+ close(sockfd);
+ return ret;
 }
 //-------------------------------------------------------------------------------------------------

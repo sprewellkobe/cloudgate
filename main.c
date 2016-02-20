@@ -82,13 +82,22 @@ int update_local_files(Config* config,Result* result)
      int k=0;
      for(;k<config->file_item_count;k++)
         {
-         if(strcmp(config->file_items[k].filename,result->files[i])==0&&
-            strlen(config->file_items[k].trigger_command)>0)
+         if(strcmp(config->file_items[k].filename,result->files[i])==0)
            {
-            system(config->file_items[k].trigger_command);
-            #ifdef MYDEBUG
-            printf("triggered %s\n",config->file_items[k].trigger_command);
-            #endif
+            if(strlen(config->file_items[k].trigger_command)>0)
+              {
+               system(config->file_items[k].trigger_command);
+               #ifdef MYDEBUG
+               printf("triggered %s\n",config->file_items[k].trigger_command);
+               #endif
+              }
+            if(strlen(config->file_items[k].trigger_unix_socket)>0)
+              {
+               send_message_to_unix_socket(config->file_items[k].trigger_unix_socket,"ok",2);
+               #ifdef MYDEBUG              
+               printf("triggered %s\n",config->file_items[k].trigger_unix_socket);
+               #endif  
+              }
             break;
            }
         }//end for k

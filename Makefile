@@ -1,6 +1,7 @@
 #updated by kobe, 2016.1.13
 #---------------------------------------------------------------------------------------------
-TOOLPREFIX      =mips-linux-
+OS=`cat /etc/redhat-release | grep CentOS`
+#TOOLPREFIX=$(shell if [[ -z "$(OS)" ]];then echo mips-linux-;else echo "";fi)
 TARGET=cloudgate
 BUILDVERSION=$(shell date +%Y%m%d)
 

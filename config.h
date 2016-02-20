@@ -28,6 +28,7 @@ typedef struct FileItem_s
  unsigned char md5[16];
  time_t last_modify_time;
  char trigger_command[TRIGGER_COMMAND_MAX_SIZE];
+ char trigger_unix_socket[FILE_NAME_MAX_SIZE];
 }FileItem;
 
 typedef struct Config_s

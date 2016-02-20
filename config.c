@@ -65,6 +65,10 @@ int load_config(Config* config,const char* filename)
           {
            strcpy(fi->trigger_command,value);
           }
+       else if(strcmp(key,"trigger_unix_socket")==0)
+          {
+           strcpy(fi->trigger_unix_socket,value);
+          }
       }//end while
  if(fi)
    {
@@ -88,8 +92,9 @@ check_time_interval:%d\nap_version:%s\naeskey:%s\n",
  int i=0;
  for(;i<config.file_item_count;i++)
     {
-     printf("%s,%s:\n",config.file_items[i].filename,
-                       config.file_items[i].trigger_command);
+     printf("%s,%s,%s:\n",config.file_items[i].filename,
+                          config.file_items[i].trigger_command,
+                          config.file_items[i].trigger_unix_socket);
      int k=0;
      for(;k<FILE_MAX_SECTION;k++)
         {

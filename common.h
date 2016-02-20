@@ -17,5 +17,6 @@ void write_to_hex(char* in,size_t in_length,char* out);
 void read_from_hex(char*in,char* out,size_t* out_length);
 int do_aes_encrypt(char* in,char* out,char* key_);
 int do_aes_decrypt(char* in,char* out,char* key_);
+int send_message_to_unix_socket(char* socket_name,char* message,size_t length);
 //-------------------------------------------------------------------------------------------------
 #endif
