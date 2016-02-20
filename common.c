@@ -329,17 +329,17 @@ int do_aes_decrypt(char* in_,char* out,char* key_)
 int send_message_to_unix_socket(char* socket_name,char* message,size_t length)
 {
  int sockfd;
- struct sockaddr_un ApiName;
+ struct sockaddr_un sa;
  int ret;
  if((sockfd=socket(AF_UNIX,SOCK_DGRAM,0))==-1)
    {
     printf("%lu\tfailed to create unix socket %d\n",time(NULL),errno);
     return -1;
    }
- memset (&ApiName, 0, sizeof(struct sockaddr_un));
- ApiName.sun_family = AF_UNIX;
- snprintf(ApiName.sun_path,sizeof(ApiName.sun_path),socket_name);
- ret=sendto(sockfd,message,length,0,(struct sockaddr *)&ApiName,sizeof(ApiName));
+ memset (&sa, 0, sizeof(struct sockaddr_un));
+ sa.sun_family = AF_UNIX;
+ snprintf(sa.sun_path,sizeof(sa.sun_path),socket_name);
+ ret=sendto(sockfd,message,length,0,(struct sockaddr *)&sa,sizeof(sa));
  if(ret<0)
     printf("%lu\tfailed to sendto %s\n",time(NULL),socket_name);
  close(sockfd);
