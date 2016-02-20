@@ -36,6 +36,8 @@ cloudgate.ini example:
     end_string="quit"
     #when ap local file /etc/router.conf updated, trigger to run a system shell
     trigger_command="service xxx restart"
+    #when ap local file /etc/router.conf updated, trigger to send message "ok" to unix socket /tmp/sdd.sock
+    trigger_unix_socket="/tmp/sdd.sock"
 
     filename=/etc/hosts
     filename=/data/myservice.conf
