@@ -1,13 +1,13 @@
 #updated by kobe, 2016.1.13
 #---------------------------------------------------------------------------------------------
 OS=`cat /etc/redhat-release | grep CentOS`
-#TOOLPREFIX=$(shell if [[ -z "$(OS)" ]];then echo mips-linux-;else echo "";fi)
+TOOLPREFIX=$(shell if [[ -z "$(OS)" ]];then echo mips-linux-;else echo "";fi)
 TARGET=cloudgate
 BUILDVERSION=$(shell date +%Y%m%d)
 
 CUN_DIR         = $(shell pwd)
 
-ifdef TOOLPREFIX
+ifneq "${TOOLPREFIX}" ""
 BASE_DIR        = $(CUN_DIR)/../..
 NBOS_SRC_DIR    = $(BASE_DIR)
 APPS_DIR        = $(NBOS_SRC_DIR)/apps
