@@ -418,6 +418,9 @@ int set_ap_leave_all_groups(Config* config)
     printf("%lu\tset group leave failed %d\n",time(NULL),rc);
     return -1;
    }
+ #ifdef MYDEBUG
+ printf("%lu\tset ap left all groups\n",time(NULL));
+ #endif
  return 1;
 }
 //-------------------------------------------------------------------------------------------------
