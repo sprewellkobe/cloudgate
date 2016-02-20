@@ -1,14 +1,31 @@
 #updated by kobe, 2016.1.13
 #---------------------------------------------------------------------------------------------
+TOOLPREFIX      =mips-linux-
 TARGET=cloudgate
 BUILDVERSION=$(shell date +%Y%m%d)
 
+CUN_DIR         = $(shell pwd)
+
+ifdef TOOLPREFIX
+BASE_DIR        = $(CUN_DIR)/../..
+NBOS_SRC_DIR    = $(BASE_DIR)
+APPS_DIR        = $(NBOS_SRC_DIR)/apps
+UTIL_DIR        = $(APPS_DIR)/util
+INCLUDE_PATH    = $(APPS_DIR)/include
+LIBS_PATH       = $(APPS_DIR)/lib
+INCPATH         = -I$(INCLUDE_PATH) -I$(UTIL_DIR)
+LDPATH          = -L$(LIBS_PATH)/curl -L$(LIBS_PATH)/openssl -L$(UTIL_DIR)
+LIBS            += -lutil
+DEF				 += -DBUILD_MIPS
+else
+INCPATH         = -I/usr/include/ -I./
+endif
+LIBS            += -lcurl -lcrypto -lssl
+
+#---------------------------------------------------------------------------------------------
 CC=$(TOOLPREFIX)gcc
-DEF=-DBUILDVERSION=$(BUILDVERSION) -DMYDEBUG
+DEF+=-DBUILDVERSION=$(BUILDVERSION) -DMYDEBUG
 CFLAGS=-g -O2 -Wall -fno-strict-aliasing $(DEF)
-INCPATH=-I/usr/include/ -I./
-LDPATH=
-LIBS=-lcurl
 #---------------------------------------------------------------------------------------------
 
 all: $(TARGET)

@@ -5,6 +5,9 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef BUILD_MIPS
+#include "nbos_hal_api.h"
+#endif
 #include "common.h"
 #include "config.h"
 #include "mycurl.h"
@@ -255,14 +258,22 @@ int parse_result(char* received,Result* result)
 
 int loop_handle(Config* config)
 {
+	char mac_string[32];
+#ifdef BUILD_MIPS
+ memset(mac_string, 0, sizeof(mac_string));
+ if(nbos_read_mac(mac_string) < 0) {
+   printf("failed to get mac, errno:%d\n",errno);
+   return -1;
+ }
+#else
  unsigned char mac[6];
  if(get_mac(mac)<0)
    {
     printf("failed to get mac, errno:%d\n",errno);
     return -1;
    }
- char mac_string[32];
  mac2string(mac,mac_string);
+#endif
 
  unsigned char md5[16];
  if(get_files_md5((void*)config,md5)<0)
