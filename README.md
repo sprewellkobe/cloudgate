@@ -24,7 +24,7 @@ cloudgate.ini example:
     #how offen connect to cloud
     check_time_interval=3
     #ap version number
-    ap_version=1210
+    ap_version=NBOS-1.0.3.1507
     #aeskey to encrypt post data
     aeskey=kisslinkkisslink
 
@@ -44,6 +44,11 @@ cloudgate.ini example:
 
     while(true)
          {
+          if file_exists /tmp/cloudgate_reload_config
+            {
+             reload config
+             rm /tmp/cloudgate_reload_config
+            } 
           compare local_config with cloud_config
           if(local_config == cloud_config)
              continue
@@ -58,3 +63,7 @@ cloudgate.ini example:
          }
          
 API: http://kisswiki.sinaapp.com/debug.kisslink.com接口
+
+#how to reload config
+
+touch /tmp/cloudgate_reload_config

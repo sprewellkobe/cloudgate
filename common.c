@@ -12,7 +12,7 @@
 static unsigned char old_md5[16];
 static time_t old_md5_timestamp;
 static FileItem old_file_items[FILE_MAX_NUMBER];
-const unsigned char AES_IV_PADDING_CHAR='X';
+const unsigned char AES_IV_PADDING_CHAR='0';
 const char* CIPHER_NAME="aes-128-cbc";
 //-------------------------------------------------------------------------------------------------
 
@@ -60,6 +60,12 @@ char* md52string(unsigned char* m,char* string)
 int get_mac(unsigned char* mac)
 {
  memset(mac,0,6);
+ mac[0]=0xb8;
+ mac[1]=0x09;
+ mac[2]=0x8a;
+ mac[3]=0xc9;
+ mac[4]=0x92;
+ mac[5]=0xc1;
  return 1;
 }
 //--------------------------------------------------------------------------------------------------
@@ -204,7 +210,7 @@ int get_files_md5(void* config_,unsigned char* md)
      p=p2;
     }
  md5(buffer,p,md);
- memcpy(old_md5,md,sizeof(md));
+ memcpy(old_md5,md,sizeof(old_md5));
  memcpy(old_file_items,config->file_items,sizeof(config->file_items));
  old_md5_timestamp=time(NULL);
  return 1;
@@ -304,6 +310,7 @@ int do_aes_decrypt(char* in_,char* out,char* key_)
  EVP_DecryptInit_ex(&cipher_ctx,NULL,NULL,key,iv);
  int m=0;
  EVP_DecryptUpdate(&cipher_ctx,(unsigned char*)out,&m,(unsigned char *)in,in_length);
+ out_length=m;
  if(EVP_DecryptFinal(&cipher_ctx,(unsigned char *)out+m,&m)) 
    {
     out_length+=m;

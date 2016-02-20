@@ -14,10 +14,6 @@
 #include "cjson.h"
 #include "base64.h"
 //-------------------------------------------------------------------------------------------------
-#define AESENCODE
-#define POST_DATA_MAX_SIZE 64*1024
-#define RECEIVE_DATA_MAX_SIZE 64*1024
-//-------------------------------------------------------------------------------------------------
 typedef struct Result_s
 {
  char result[16];
@@ -110,22 +106,26 @@ int check_config_build_post_data(Config* config,char* mac_string,char* md5_strin
  cJSON* files;
  cJSON* item;
  root=cJSON_CreateObject();
+
  cJSON_AddStringToObject(root,"apid",mac_string);
- cJSON_AddStringToObject(root,"checksum",md5_string);
  cJSON_AddStringToObject(root,"version",config->ap_version);
+ cJSON_AddStringToObject(root,"checksum",md5_string);
  cJSON_AddItemToObject(root,"files",files=cJSON_CreateArray());
  int i=0;
  for(;i<config->file_item_count;i++)
     {
      cJSON_AddItemToArray(files,item=cJSON_CreateObject());
-     cJSON_AddStringToObject(item,"filename",config->file_items[i].filename);
      char tmp[64];
      md52string(config->file_items[i].md5,tmp);
      cJSON_AddStringToObject(item,"checksum",tmp);
-     sprintf(tmp,"%lu",config->file_items[i].last_modify_time);
-     cJSON_AddStringToObject(item,"timestamp",tmp);
+     //sprintf(tmp,"%lu",config->file_items[i].last_modify_time);
+     cJSON_AddNumberToObject(item,"timestamp",config->file_items[i].last_modify_time);
+     cJSON_AddStringToObject(item,"filename",config->file_items[i].filename);
     }
  char* out=cJSON_PrintUnformatted(root);
+ #ifdef MYDEBUG
+ printf("post_data1:%lu:%s\n",strlen(out),out);
+ #endif
  #ifdef AESENCODE
  size_t out_length=strlen(out);
  char* out2=calloc(out_length*8,sizeof(char));
@@ -135,7 +135,7 @@ int check_config_build_post_data(Config* config,char* mac_string,char* md5_strin
  #endif
  strcpy(post_data,out);
  #ifdef MYDEBUG
- printf("post_data:[%s]\n",post_data);
+ printf("post_data2:%lu:%s\n",strlen(post_data),post_data);
  #endif
  free(out);
  cJSON_Delete(root);
@@ -151,6 +151,7 @@ int update_server_config_build_post_data(Config* config,char* mac_string,
  cJSON* item;
  root=cJSON_CreateObject();
  cJSON_AddStringToObject(root,"apid",mac_string);
+ cJSON_AddStringToObject(root,"version",config->ap_version);
  cJSON_AddItemToObject(root,"files",files=cJSON_CreateArray());
  int i=0;
  for(;i<result->file_count;i++)
@@ -175,12 +176,11 @@ int update_server_config_build_post_data(Config* config,char* mac_string,
         free(content);
         break;
        }
-     char tmp[64];
-     sprintf(tmp,"%lu",st.st_mtime);
-     cJSON_AddStringToObject(item,"timestamp",tmp);
+     cJSON_AddNumberToObject(item,"timestamp",st.st_mtime);
     
      unsigned char digest[16];
      md5(content,content+file_length,digest);
+     char tmp[64];
      md52string(digest,tmp);
      cJSON_AddStringToObject(item,"checksum",tmp);
      
@@ -281,7 +281,8 @@ int loop_handle(Config* config)
     printf("failed to get md5, errno:%d\n",errno);
     return -1;
    }
- char md5_string[32];
+ char md5_string[64];
+ memset(md5_string,0,64);
  md52string(md5,md5_string);
  char url[256];
  sprintf(url,"http://%s/check_config?apid=%s&checksum=%s&version=%s",
@@ -294,59 +295,94 @@ int loop_handle(Config* config)
  memset(&result,0,sizeof(result));
  int rc=-99;
  int pc=0;
- if((rc=do_wget(config,url,post_data,received))==200&&(pc=parse_result(received,&result))>0)
+ if((rc=do_wget(config,url,post_data,received))!=200)
    {
-    if(strcmp(result.result,"nothingtodo")==0)//when cloud config == ap config
-      {
-       printf("%lu nothing to do\n",time(NULL));
-       return 2;
-      }
-    if(strcmp(result.result,"apupdate")==0)//when server is newer
-      {
-       if(update_local_files(config,&result)>0)
-         {
-          printf("%lu ap updated:\n",time(NULL));
-          unsigned short i=0;
-          for(;i<result.file_count;i++)
-              printf("\t%s\n",result.files[i]);
-	 }
-       else
-          printf("%lu ap update file failed, errno:%d\n",time(NULL),errno);
-       free_result(&result);
-       return 3;
-      }
-    if(strcmp(result.result,"serverupdate")==0)//when ap is newer
-      {
-       sprintf(url,"http://%s/update_server_config?apid=%s",config->base_domain,mac_string);
-       update_server_config_build_post_data(config,mac_string,&result,post_data);
-       if((rc=do_wget(config,url,post_data,received))==200&&
-          (pc=parse_result(received,&result))>0)
-         {
-	  if(strcmp(result.result,"ok")==0)
-	    {
-	     printf("%lu server updated:\n",time(NULL));
-	     int i=0;
-	     for(;i<result.file_count;i++)
-	         printf("\t%s\n",result.files[i]);
-	    }
-	  else if(strcmp(result.result,"fail")==0)
-	    {
-	     printf("%lu server update failed1 %s\n",time(NULL),result.reason);
-	    }
-	 }
-       else
-          printf("%lu server update failed2 %d\n",time(NULL),rc);
-       free_result(&result);
-       return 4;
-      }
-   }//end if do_wget
- #ifdef MYDEBUG
- if(pc<0)
-    printf("%lu failed to parse %s\n",time(NULL),received);
- else
+    #ifdef MYDEBUG
     printf("%lu curl failed %d %s\n",time(NULL),rc,url);
+    #endif
+    return -1;
+   }
+ #ifdef AESENCODE
+ #ifdef MYDEBUG
+ printf("received:%s\n",received);
  #endif
- return -1; 
+ char* tmp=malloc(RECEIVE_DATA_MAX_SIZE);
+ do_aes_decrypt(received,tmp,config->aeskey);
+ sprintf(received,"%s",tmp);
+ free(tmp);
+ #endif 
+ #ifdef MYDEBUG
+ printf("received2:%s\n",received);
+ #endif
+ if((pc=parse_result(received,&result))<0)
+   {
+    #ifdef MYDEBUG
+    printf("%lu failed to parse %s\n",time(NULL),received);
+    #endif
+   }
+ if(strcmp(result.result,"nothingtodo")==0)//when cloud config == ap config
+   {
+    printf("%lu nothing to do\n",time(NULL));
+    return 2;
+   }
+ if(strcmp(result.result,"apupdate")==0)//when server is newer
+   {
+    if(update_local_files(config,&result)>0)
+      {
+       printf("%lu ap updated:\n",time(NULL));
+       unsigned short i=0;
+       for(;i<result.file_count;i++)
+           printf("\t%s\n",result.files[i]);
+      }
+    else
+       printf("%lu ap update file failed, errno:%d\n",time(NULL),errno);
+    free_result(&result);
+    return 3;
+   }
+ if(strcmp(result.result,"serverupdate")==0)//when ap is newer
+   {
+    sprintf(url,"http://%s/update_server_config?apid=%s",config->base_domain,mac_string);
+    update_server_config_build_post_data(config,mac_string,&result,post_data);
+    if((rc=do_wget(config,url,post_data,received))!=200)
+      {
+       printf("%lu server update failed2 %d\n",time(NULL),rc);
+       free_result(&result);
+       return -5;
+      }
+    #ifdef AESENCODE
+    #ifdef MYDEBUG
+    printf("received:%s\n",received);
+    #endif
+    char* tmp=malloc(RECEIVE_DATA_MAX_SIZE);
+    do_aes_decrypt(received,tmp,config->aeskey);
+    sprintf(received,"%s",tmp);
+    free(tmp);
+    #endif
+    if((pc=parse_result(received,&result))<0)
+      {
+       #ifdef MYDEBUG
+       printf("%lu failed to parse2 %s\n",time(NULL),received);
+       free_result(&result);
+       return -6;
+       #endif
+      }
+    if(strcmp(result.result,"ok")==0)
+      {
+       printf("%lu server updated:\n",time(NULL));
+       int i=0;
+       for(;i<result.file_count;i++)
+	   printf("\t%s\n",result.files[i]);
+      }
+    else if(strcmp(result.result,"fail")==0)
+      {
+       printf("%lu server update failed1 %s\n",time(NULL),result.reason);
+      }
+    else
+       printf("%lu server update failed3\n",time(NULL));
+    free_result(&result);
+    return 4;
+   }
+ return -7; 
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -371,9 +407,6 @@ void test(Config* config)//only for test
  char post_data[1024];
  check_config_build_post_data(config,mac_string,md5_string,post_data);
  */
- char s[16]="\"\"";
- char* ss=trim(s);
- printf("trim:%s\n",ss); 
 
  /*build_decoding_table();
  char* input="abc";
@@ -401,8 +434,8 @@ void test(Config* config)//only for test
  else
     printf("parse failed %d %s\n",rv,s);
  free_result(&result);
-
- s="abc";
+*/
+ char* s="{\"result\":\"apupdate\",\"files\":[{\"/etc/kisslink\":\"c3NzMjIyMnNzcwo=\"}]}";
  char out[1024];
  int rt=do_aes_encrypt(s,out,config->aeskey);
  if(rt>0)
@@ -415,7 +448,7 @@ void test(Config* config)//only for test
  if(rt>0)
     printf(":<:\%s\n",out2);
  else
-    printf("failed %d\n",rt);*/
+    printf("failed %d\n",rt);
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -438,8 +471,23 @@ int main(int argc,char* argv[])
 
  //test(&config);
  int i=0;
- while(i++<3)
+ while(1<20)
       {
+       i=0;
+       struct stat st;
+       if(stat((char*)RELOAD_CONFIG,&st)==0)
+         {
+          Config tc;
+          if(load_config(&tc,argv[1])>0)
+            {
+             memcpy(&config,&tc,sizeof(config));
+             printf("%lu config reloaded\n",time(NULL));
+             #ifdef MYDEBUG
+             print_config(config);
+             #endif
+            }
+          unlink(RELOAD_CONFIG);
+         } 
        loop_handle(&config);
        sleep(config.check_time_interval);
       }
