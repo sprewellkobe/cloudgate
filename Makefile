@@ -3,6 +3,7 @@
 OS=`cat /etc/redhat-release | grep CentOS`
 #TOOLPREFIX=$(shell if [[ -z "$(OS)" ]];then echo mips-linux-;else echo "";fi)
 TARGET=cloudgate
+TARGET_CONF=cloudgate.ini
 BUILDVERSION=$(shell date +%Y%m%d)
 
 CUN_DIR         = $(shell pwd)
@@ -14,9 +15,10 @@ APPS_DIR        = $(NBOS_SRC_DIR)/apps
 UTIL_DIR        = $(APPS_DIR)/util
 INCLUDE_PATH    = $(APPS_DIR)/include
 LIBS_PATH       = $(APPS_DIR)/lib
-INCPATH         = -I$(INCLUDE_PATH) -I$(UTIL_DIR)
-LDPATH          = -L$(LIBS_PATH)/curl -L$(LIBS_PATH)/openssl -L$(UTIL_DIR)
-LIBS            += -lutil
+AMU_PATH     	 = $(APPS_DIR)/amu
+INCPATH         = -I$(INCLUDE_PATH) -I$(UTIL_DIR) -I$(AMU_PATH)/amu_lib
+LDPATH          = -L$(LIBS_PATH)/curl -L$(LIBS_PATH)/openssl -L$(UTIL_DIR) -L$(AMU_PATH)/amu_lib
+LIBS            += -lutil -lamu
 DEF				 += -DBUILD_MIPS
 else
 INCPATH         = -I/usr/include/ -I./
@@ -47,3 +49,4 @@ clean:
 install:
 	install -d $(INSTALL_ROOT)/usr/sbin/
 	install $(TARGET) $(INSTALL_ROOT)/usr/sbin/
+	install $(TARGET_CONF) $(INSTALL_ROOT)/etc/default/

@@ -5,14 +5,21 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef BUILD_MIPS
-#include "nbos_hal_api.h"
-#endif
 #include "common.h"
 #include "config.h"
 #include "mycurl.h"
 #include "cjson.h"
 #include "base64.h"
+
+#ifdef BUILD_MIPS
+#include "nbos_hal_api.h"
+#include "nbos_log.h"
+#include "amu_lib.h"
+
+#define  D_CLOUDGATE_LOG_FILE		"/var/log/cloudgate.log"
+#define  D_CLOUDGATE_LOG_LEVEL		LOG_INFO
+#endif
+
 //-------------------------------------------------------------------------------------------------
 typedef struct Result_s
 {
@@ -468,6 +475,14 @@ int main(int argc,char* argv[])
     display_usage();
     return 0;
    }
+#ifdef BUILD_MIPS
+ if (nbos_log_init("cloudgate", D_CLOUDGATE_LOG_LEVEL, D_CLOUDGATE_LOG_FILE) != 0) {
+	 printf("cloudgate: log file init fails, exit...\n");
+    return 0;
+ }
+ nbos_log_set_size(3*INFO_FILE_SIZE_LIMIT);
+#endif
+
  Config config;
  if(load_config(&config,argv[1])<0)
    {
@@ -477,6 +492,11 @@ int main(int argc,char* argv[])
  #ifdef MYDEBUG
  print_config(config);
  #endif
+
+#ifdef BUILD_MIPS
+ /*start amu watchdog*/
+ Amu_Start_Processing();
+#endif
 
  //test(&config);
  int i=0;
