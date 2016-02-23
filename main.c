@@ -274,7 +274,7 @@ int parse_result(char* received,Result* result)
 
 int loop_handle(Config* config)
 {
-	char mac_string[32];
+ char mac_string[32];
 #ifdef BUILD_MIPS
  memset(mac_string, 0, sizeof(mac_string));
  if(nbos_read_mac(mac_string) < 0) {
@@ -402,6 +402,36 @@ int loop_handle(Config* config)
 }
 //-------------------------------------------------------------------------------------------------
 
+int set_ap_leave_all_groups(Config* config)
+{
+ unsigned char mac[6];
+ get_mac(mac);
+ char mac_string[32];
+ mac2string(mac,mac_string);
+ char buffer1[64];
+ sprintf(buffer1,"apid=%s&opt=group_leave",mac_string);
+ char* get_data=buffer1;
+ #ifdef AESENCODE
+ char buffer2[512];
+ do_aes_encrypt(buffer1,buffer2,config->aeskey);
+ get_data=buffer2;
+ #endif
+ char url[640];
+ sprintf(url,"http://%s/grp?msg=%s",config->base_domain,get_data);
+ int rc=0;
+ char received[RECEIVE_DATA_MAX_SIZE];
+ if((rc=do_wget(config,url,NULL,received))!=200)
+   {
+    printf("%lu\tset group leave failed %d\n",time(NULL),rc);
+    return -1;
+   }
+ #ifdef MYDEBUG
+ printf("%lu\tset ap left all groups\n",time(NULL));
+ #endif
+ return 1;
+}
+//-------------------------------------------------------------------------------------------------
+
 void test(Config* config)//only for test
 {
  /*
@@ -504,22 +534,36 @@ int main(int argc,char* argv[])
       {
        i=0;
        struct stat st;
-       if(stat((char*)RELOAD_CONFIG,&st)==0)
+       if(stat((char*)RELOAD_CONFIG,&st)==0)//reload config if need
          {
           Config tc;
           if(load_config(&tc,argv[1])>0)
             {
              memcpy(&config,&tc,sizeof(config));
-             printf("%lu config reloaded\n",time(NULL));
+             printf("%lu\tconfig reloaded\n",time(NULL));
              #ifdef MYDEBUG
              print_config(config);
              #endif
             }
           unlink(RELOAD_CONFIG);
-         } 
+          continue;
+         }//end if
+       memset(&st,0,sizeof(st));
+       if(strlen(config.ap_reset_tag)>0&&
+          stat(config.ap_reset_tag,&st)==0)//when ap just reset
+         {
+          if(set_ap_leave_all_groups(&config)>0)
+            {
+             #ifdef MYDEBUG
+             printf("%lu\tset ap left all groups\n",time(NULL));
+             #endif
+             unlink(config.ap_reset_tag);
+            }
+          continue;
+         }//end if
        loop_handle(&config);
        sleep(config.check_time_interval);
-      }
+      }//end while true
  return 0;
 }
 //---------------------------------------------------------------------------------------------------

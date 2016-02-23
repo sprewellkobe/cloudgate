@@ -50,7 +50,14 @@ cloudgate.ini example:
             {
              reload config
              rm /tmp/cloudgate_reload_config
-            } 
+             continue
+            }
+          if file_exists /tmp/ap_just_after_reset
+            {
+             if( curl cloud api to notify ap leave all groups == ok)
+                unlink /tmp/ap_just_after_reset
+             continue;
+            }
           compare local_config with cloud_config
           if(local_config == cloud_config)
              continue

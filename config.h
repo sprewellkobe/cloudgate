@@ -39,6 +39,7 @@ typedef struct Config_s
  uint32_t check_time_interval;
  char ap_version[16];
  char aeskey[32];
+ char ap_reset_tag[FILE_NAME_MAX_SIZE];
  FileItem file_items[FILE_MAX_NUMBER];
  unsigned short file_item_count;
 }Config;
