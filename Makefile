@@ -1,9 +1,10 @@
 #updated by kobe, 2016.1.13
 #---------------------------------------------------------------------------------------------
-OS=`cat /etc/redhat-release | grep CentOS`
-TOOLPREFIX=$(shell if [[ -z "$(OS)" ]];then echo mips-linux-;else echo "";fi)
+#OS=`cat /etc/redhat-release | grep CentOS`
+#TOOLPREFIX=$(shell if [[ -z "$(OS)" ]];then echo mips-linux-;else echo "";fi)
 TARGET=cloudgate
 TARGET_CONF=cloudgate.ini
+NBSH_SYNC_CMD=nbsh_sycn_cmd.sh
 BUILDVERSION=$(shell date +%Y%m%d)
 
 CUN_DIR         = $(shell pwd)
@@ -49,4 +50,6 @@ clean:
 install:
 	install -d $(INSTALL_ROOT)/usr/sbin/
 	install $(TARGET) $(INSTALL_ROOT)/usr/sbin/
+	install $(NBSH_SYNC_CMD) $(INSTALL_ROOT)/usr/local/sbin/
 	install $(TARGET_CONF) $(INSTALL_ROOT)/etc/default/
+	
