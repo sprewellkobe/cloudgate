@@ -85,7 +85,7 @@ void print_config(Config config)
 {
  printf("\n-----begin of config-----\n\n");
  printf("base_domain:%s\nrequest_timeout_seconds:%d\nconnection_timeout_seconds:%d\n\
-check_time_interval:%d\nap_version:%s\naeskey:%sap_reset_tag:%s\n", 
+check_time_interval:%d\nap_version:%s\naeskey:%s\nap_reset_tag:%s\n", 
          config.base_domain,config.request_timeout_seconds,
          config.connection_timeout_seconds,
          config.check_time_interval,config.ap_version,

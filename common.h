@@ -18,5 +18,12 @@ void read_from_hex(char*in,char* out,size_t* out_length);
 int do_aes_encrypt(char* in,char* out,char* key_);
 int do_aes_decrypt(char* in,char* out,char* key_);
 int send_message_to_unix_socket(char* socket_name,char* message,size_t length);
+
+void get_wtp_ip(void* config_,char* string);
+void get_primary_ver(void* config_,char* string);
+void get_factory_ver(void* config_,char* string);
+void get_backup_ver(void* config_,char* string);
+void get_uplinktype(void* config_,char* string);
+unsigned int get_ternum(void* config_);
 //-------------------------------------------------------------------------------------------------
 #endif

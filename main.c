@@ -124,19 +124,34 @@ int check_config_build_post_data(Config* config,char* mac_string,char* md5_strin
  root=cJSON_CreateObject();
 
  cJSON_AddStringToObject(root,"apid",mac_string);
- cJSON_AddStringToObject(root,"version",config->ap_version);
  cJSON_AddStringToObject(root,"checksum",md5_string);
+ cJSON_AddStringToObject(root,"version",config->ap_version);
+
+ //added
+ char temp[64];
+ get_wtp_ip(config,temp);
+ cJSON_AddStringToObject(root,"wtp_ip",temp);
+ get_primary_ver(config,temp);
+ cJSON_AddStringToObject(root,"primary_ver",temp);
+ get_factory_ver(config,temp);
+ cJSON_AddStringToObject(root,"factory_ver",temp);
+ get_backup_ver(config,temp);
+ cJSON_AddStringToObject(root,"backup_ver",temp);
+ get_uplinktype(config,temp);
+ cJSON_AddStringToObject(root,"uplinktype",temp);
+ cJSON_AddNumberToObject(root,"ternum",get_ternum(config));
+
  cJSON_AddItemToObject(root,"files",files=cJSON_CreateArray());
  int i=0;
  for(;i<config->file_item_count;i++)
     {
      cJSON_AddItemToArray(files,item=cJSON_CreateObject());
+     cJSON_AddStringToObject(item,"filename",config->file_items[i].filename);
      char tmp[64];
      md52string(config->file_items[i].md5,tmp);
      cJSON_AddStringToObject(item,"checksum",tmp);
      //sprintf(tmp,"%lu",config->file_items[i].last_modify_time);
      cJSON_AddNumberToObject(item,"timestamp",config->file_items[i].last_modify_time);
-     cJSON_AddStringToObject(item,"filename",config->file_items[i].filename);
     }
  char* out=cJSON_PrintUnformatted(root);
  #ifdef MYDEBUG
@@ -204,6 +219,9 @@ int update_server_config_build_post_data(Config* config,char* mac_string,
     }//end for
  char* out=cJSON_PrintUnformatted(root);
  #ifdef AESENCODE
+ #ifdef MYDEBUG
+ //printf("post_data_o:[%s]\n",out);
+ #endif
  size_t out_length=strlen(out);
  char* out2=calloc(out_length*8,sizeof(char));
  do_aes_encrypt(out,out2,config->aeskey);
@@ -212,7 +230,7 @@ int update_server_config_build_post_data(Config* config,char* mac_string,
  #endif
  strcpy(post_data,out);
  #ifdef MYDEBUG
- printf("post_data:[%s]\n",post_data);
+ printf("post_data_d:[%s]\n",post_data);
  #endif
  free(out);
  cJSON_Delete(root);
@@ -220,19 +238,44 @@ int update_server_config_build_post_data(Config* config,char* mac_string,
 }
 //-------------------------------------------------------------------------------------------------
 
-int parse_result(char* received,Result* result)
+int parse_result(char* received,char* message,Result* result)
 {
  memset(result,0,sizeof(Result));
  cJSON* root=cJSON_Parse(received);
  if(root==NULL)
     return -1;
+ int status=0;
  cJSON* item;
- item=cJSON_GetObjectItem(root,"result");
+ item=cJSON_GetObjectItem(root,"status");
  if(item==NULL)
+   {
+    cJSON_Delete(root);
+    return -7;
+   }
+ status=item->valueint;
+ item=cJSON_GetObjectItem(root,"message");
+ if(item==NULL)
+   {
+    cJSON_Delete(root);
+    return -8;
+   }
+ strcpy(message,item->valuestring);
+ cJSON* root2=cJSON_GetObjectItem(root,"data");
+ if(status!=0||root2==NULL)
+   {
+    cJSON_Delete(root);
+    return -3;
+   }
+
+ item=cJSON_GetObjectItem(root2,"result");
+ if(item==NULL)
+   {
+    cJSON_Delete(root); 
     return -2;
+   }
  strcpy(result->result,item->valuestring);
  item=NULL;
- item=cJSON_GetObjectItem(root,"files");
+ item=cJSON_GetObjectItem(root2,"files");
  if(item!=NULL)
    {
     result->file_count=cJSON_GetArraySize(item);
@@ -250,9 +293,9 @@ int parse_result(char* received,Result* result)
        }
    }//end if files
  item=NULL;
- item=cJSON_GetObjectItem(root,"filenames");
+ item=cJSON_GetObjectItem(root2,"filenames");
  if(item==NULL)
-    item=cJSON_GetObjectItem(root,"updated_filenames");
+    item=cJSON_GetObjectItem(root2,"updated_filenames");
  if(item!=NULL)
    {
     result->file_count=cJSON_GetArraySize(item);
@@ -264,7 +307,7 @@ int parse_result(char* received,Result* result)
        }
    }//end if filenames updated_filenames
  item=NULL;
- item=cJSON_GetObjectItem(root,"reason");
+ item=cJSON_GetObjectItem(root2,"reason");
  if(item!=NULL)
     strcpy(result->reason,item->valuestring);
  cJSON_Delete(root); 
@@ -330,10 +373,12 @@ int loop_handle(Config* config)
  #ifdef MYDEBUG
  printf("received2:%s\n",received);
  #endif
- if((pc=parse_result(received,&result))<0)
+ char message[32];
+ memset(message,0,32);
+ if((pc=parse_result(received,message,&result))<0)
    {
     #ifdef MYDEBUG
-    printf("%lu failed to parse %s\n",time(NULL),received);
+    printf("%lu %s, failed to parse %s\n",time(NULL),message,received);
     #endif
    }
  if(strcmp(result.result,"nothingtodo")==0)//when cloud config == ap config
@@ -374,10 +419,11 @@ int loop_handle(Config* config)
     sprintf(received,"%s",tmp);
     free(tmp);
     #endif
-    if((pc=parse_result(received,&result))<0)
+    memset(message,0,32);
+    if((pc=parse_result(received,message,&result))<0)
       {
        #ifdef MYDEBUG
-       printf("%lu failed to parse2 %s\n",time(NULL),received);
+       printf("%lu %s,failed to parse2 %s\n",time(NULL),message,received);
        free_result(&result);
        return -6;
        #endif
@@ -434,10 +480,11 @@ int set_ap_leave_all_groups(Config* config)
 
 void test(Config* config)//only for test
 {
+ int rv=0;
  /*
  unsigned char md5[16];
  char md5_string[32];
- int rv=get_files_md5((void*)config,md5);
+ rv=get_files_md5((void*)config,md5);
  if(rv<0)
     printf("md5 failed %d\n",rv);
  else
@@ -464,23 +511,28 @@ void test(Config* config)//only for test
  free(output2);
  free(output);
  base64_cleanup();*/
- /*
- char* s="{\"result\":\"apupdate\",\"files\":[{\"/tmp/aaa\":\"YWJj\"},{\"/tmp/bbb\":\"YWJj\"}]}";
+ 
+ char* s2="{\"result\":\"apupdate\",\"files\":[{\"/tmp/aaa\":\"YWJj\"},{\"/tmp/bbb\":\"YWJj\"}]}";
+ char s[256];
+ sprintf(s,"{\"status\":1,\"message\":\"kobe\",\"data\":%s}",s2);
+ char message[32];
+ memset(message,0,32);
  Result result;
- rv=parse_result(s,&result);
+ rv=parse_result(s,message,&result);
  if(rv>0)
    {
     print_result(&result);
-    if(strcmp(result.result,"apupdate")==0)
+    /*if(strcmp(result.result,"apupdate")==0)
       {
        rv=update_local_files(config,&result);
        printf("local files updated %d\n",rv);
-      }
+      }*/
    }
  else
-    printf("parse failed %d %s\n",rv,s);
+    printf("parse failed %d %s %s\n",rv,message,s);
  free_result(&result);
-*/
+
+ /*
  char* s="{\"result\":\"apupdate\",\"files\":[{\"/etc/kisslink\":\"c3NzMjIyMnNzcwo=\"}]}";
  char out[1024];
  int rt=do_aes_encrypt(s,out,config->aeskey);
@@ -494,7 +546,8 @@ void test(Config* config)//only for test
  if(rt>0)
     printf(":<:\%s\n",out2);
  else
-    printf("failed %d\n",rt);
+    printf("failed %d\n",rt);*/
+ exit(0);
 }
 //-------------------------------------------------------------------------------------------------
 
@@ -530,9 +583,8 @@ int main(int argc,char* argv[])
 
  //test(&config);
  int i=0;
- while(1<20)
+ while(1<3)
       {
-       i=0;
        struct stat st;
        if(stat((char*)RELOAD_CONFIG,&st)==0)//reload config if need
          {
@@ -564,6 +616,7 @@ int main(int argc,char* argv[])
        loop_handle(&config);
        sleep(config.check_time_interval);
       }//end while true
+ i=0;
  return 0;
 }
 //---------------------------------------------------------------------------------------------------
