@@ -15,7 +15,7 @@ nbsh_node_sync()
 	echo -e "enable\nenable" > $cmd_file
 	echo "configure terminal" >> $cmd_file
 	cat $1 >> $cmd_file
-	echo -e "end\nexit\nexit" >> $cmd_file
+	echo -e "end\nwrite memory\nexit\nexit" >> $cmd_file
 	nbsh -x $cmd_file
 	rm -rf $cmd_file
 }
