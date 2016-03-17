@@ -140,6 +140,9 @@ int check_config_build_post_data(Config* config,char* mac_string,char* md5_strin
  get_uplinktype(config,temp);
  cJSON_AddStringToObject(root,"uplinktype",temp);
  cJSON_AddNumberToObject(root,"ternum",get_ternum(config));
+ memset(temp, 0, sizeof(temp));
+ get_uptime(config, temp);
+ cJSON_AddStringToObject(root,"uptime", temp);
 
  cJSON_AddItemToObject(root,"files",files=cJSON_CreateArray());
  int i=0;

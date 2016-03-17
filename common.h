@@ -26,5 +26,6 @@ void get_factory_ver(void* config_,char* string);
 void get_backup_ver(void* config_,char* string);
 void get_uplinktype(void* config_,char* string);
 unsigned int get_ternum(void* config_);
+void get_uptime(void *config_, char *strtime);
 //-------------------------------------------------------------------------------------------------
 #endif

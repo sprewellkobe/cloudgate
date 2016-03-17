@@ -2,7 +2,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <netinet/in.h>
+#include <net/if.h>
 #include <sys/un.h> 
+#include <sys/sysinfo.h>
 #include <errno.h>
 #include <openssl/aes.h>
 #include <openssl/evp.h>
@@ -373,16 +377,6 @@ int send_message_to_unix_socket(char* socket_name,char* message,size_t length)
 }
 //-------------------------------------------------------------------------------------------------
 
-void get_wtp_ip(void* config_,char* string)
-{
-#ifdef BUILD_MIPS
-	sprintf(string,"%s","0.0.0.0");
-#else
-	sprintf(string,"%s","192.168.0.2");
-#endif
-}
-//-------------------------------------------------------------------------------------------------
-
 #ifdef BUILD_MIPS
 static int get_system_version(const char *file, const char *defval, char *strver)
 {
@@ -406,7 +400,6 @@ static int get_system_version(const char *file, const char *defval, char *strver
 		goto ERR_FAIL;
 	}
 	memset(strval, 0, sizeof(strval));
-//	strncpy(strval, chtemp, len-(chtemp-strbuff)-2);
 	strncpy(strval, chtemp+2, strlen(chtemp));
 	trim(strval);
 	fclose(pfile);
@@ -466,6 +459,31 @@ static int get_proc_file_str(const char *file, char *strval) {
 	fclose(pfile);
 	return 0;
 }
+
+int get_net_ip(char *eth, char *ipaddr)
+{
+	int sock_fd;
+	struct  sockaddr_in my_addr;
+	struct ifreq ifr;
+
+	if ((sock_fd = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
+		perror("socket");
+		return -1;
+	}
+
+	memset(&ifr, 0, sizeof(struct ifreq));
+	strncpy(ifr.ifr_name, eth, strlen(eth));
+
+	if (ioctl(sock_fd, SIOCGIFADDR, &ifr) < 0) {
+		printf("No Such Device %s/n",eth);
+		return -1;
+	}
+
+	memcpy(&my_addr, &ifr.ifr_addr, sizeof(my_addr));
+	strcpy(ipaddr, inet_ntoa(my_addr.sin_addr));
+	close(sock_fd);
+	return 0;
+}
 #endif
 
 #define D_CURVERSION_FILE		"/tmp/curversion"
@@ -473,6 +491,32 @@ static int get_proc_file_str(const char *file, char *strval) {
 #define D_FACTORYVERSION_FILE	"/usr/system/backup/nbos.stable"
 #define D_WLAN_CLIENT_COUNT_FILE   "/proc/sys/dev/wifi0/nb_sta_assoc"
 #define D_UPLINKTYPE_FILE			"/etc/uplinktype"
+
+void get_wtp_ip(void* config_, char* ipstr)
+{
+#ifdef BUILD_MIPS
+	char buff[64] = {0};
+	char netstr[16] = {0};
+	char *default_ip = "0.0.0.0";
+	if(get_proc_file_str(D_UPLINKTYPE_FILE, buff) < 0) {
+		strcpy(ipstr, default_ip);
+		return ;
+	}
+	if(strncmp(buff, "UPLINK_DHCP_DISCOVER", strlen("UPLINK_DHCP_DISCOVER")) == 0)
+		strcpy(netstr, "eth0");
+	else if(strncmp(buff, "UPLINK_PPPOE_DISCOVER", strlen("UPLINK_PPPOE_DISCOVER")) == 0)
+		strcpy(netstr, "ppp0");
+	else if(strncmp(buff, "UPLINK_STATION", strlen("UPLINK_STATION")) == 0)
+		strcpy(netstr, "ath0");
+	else
+		strcpy(ipstr, default_ip);
+	if(strlen(netstr) > 0)
+		get_net_ip(netstr, ipstr);
+#else
+	sprintf(ipstr, "%s","192.168.0.2");
+#endif
+}
+
 void get_primary_ver(void* config_,char* string)
 {
 #ifdef BUILD_MIPS
@@ -534,5 +578,11 @@ unsigned int get_ternum(void* config_)
 #else
 	return 5;
 #endif
+}
+
+void get_uptime(void *config_, char *strtime) {
+	struct  sysinfo info;
+	sysinfo(&info);
+	sprintf(strtime, "%ld", info.uptime);
 }
 //-------------------------------------------------------------------------------------------------
