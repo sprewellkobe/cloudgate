@@ -9,6 +9,7 @@ char* trim(char* s);
 void md5(char* from,char* to,unsigned char* p);
 char* md52string(unsigned char* m,char* string);
 int get_mac(unsigned char* mac);
+int get_mac_str(char * strmac);
 void mac2string(unsigned char* mac,char* string);
 int get_files_md5(void* config_,unsigned char* md);
 char* read_file(char* filename,size_t* file_length);

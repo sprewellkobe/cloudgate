@@ -318,21 +318,13 @@ int parse_result(char* received,char* message,Result* result)
 int loop_handle(Config* config)
 {
  char mac_string[32];
-#ifdef BUILD_MIPS
+
  memset(mac_string, 0, sizeof(mac_string));
- if(nbos_read_mac(mac_string) < 0) {
-   printf("failed to get mac, errno:%d\n",errno);
-   return -1;
- }
-#else
- unsigned char mac[6];
- if(get_mac(mac)<0)
+ if(get_mac_str(mac_string)<0)
    {
     printf("failed to get mac, errno:%d\n",errno);
     return -1;
    }
- mac2string(mac,mac_string);
-#endif
 
  unsigned char md5[16];
  if(get_files_md5((void*)config,md5)<0)
@@ -450,10 +442,9 @@ int loop_handle(Config* config)
 
 int set_ap_leave_all_groups(Config* config)
 {
- unsigned char mac[6];
- get_mac(mac);
  char mac_string[32];
- mac2string(mac,mac_string);
+ memset(mac_string, 0, sizeof(mac_string));
+ get_mac_str(mac_string);
  char buffer1[64];
  sprintf(buffer1,"apid=%s&opt=group_leave",mac_string);
  char* get_data=buffer1;

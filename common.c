@@ -11,6 +11,12 @@
 #include "md5.h"
 #include "config.h"
 #include "base64.h"
+
+#ifdef BUILD_MIPS
+#include "nbos_version.h"
+#include "nbos_hal_api.h"
+#endif
+
 //-------------------------------------------------------------------------------------------------
 static unsigned char old_md5[16];
 static time_t old_md5_timestamp;
@@ -40,6 +46,7 @@ char* trim(char* s)
       }
  return s;
 }
+
 //-------------------------------------------------------------------------------------------------
 
 void md5(char* from,char* to,unsigned char *m)
@@ -70,6 +77,25 @@ int get_mac(unsigned char* mac)
  mac[4]=0x92;
  mac[5]=0xc1;
  return 1;
+}
+
+int get_mac_str(char * strmac)
+{
+#ifdef BUILD_MIPS
+	if(nbos_read_mac(strmac) < 0) {
+		printf("failed to get mac, errno:%d\n",errno);
+		return -1;
+	}
+#else
+	unsigned char mac[6];
+	if(get_mac(mac)<0)
+	{
+		printf("failed to get mac, errno:%d\n",errno);
+		return -1;
+	}
+	mac2string(mac, strmac);
+#endif
+	return 0;
 }
 //--------------------------------------------------------------------------------------------------
 
@@ -349,36 +375,164 @@ int send_message_to_unix_socket(char* socket_name,char* message,size_t length)
 
 void get_wtp_ip(void* config_,char* string)
 {
- sprintf(string,"%s","192.168.0.2");
+#ifdef BUILD_MIPS
+	sprintf(string,"%s","0.0.0.0");
+#else
+	sprintf(string,"%s","192.168.0.2");
+#endif
 }
 //-------------------------------------------------------------------------------------------------
 
+#ifdef BUILD_MIPS
+static int get_system_version(const char *file, const char *defval, char *strver)
+{
+	FILE *pfile = NULL;
+	char strbuff[64], strval[32];
+	char *chtemp = NULL;
+	int len;
+
+	pfile = fopen(file, "r");
+	if(pfile == NULL) {
+		sprintf(strver, "%s", defval);
+		return -1;
+	}
+	memset(strbuff, 0, sizeof(strbuff));
+	len = fread(strbuff, 1, sizeof(strbuff), pfile);
+	if(len < 0) {
+		goto ERR_FAIL;
+	}
+	chtemp = strchr(strbuff, ':');
+	if(chtemp == NULL) {
+		goto ERR_FAIL;
+	}
+	memset(strval, 0, sizeof(strval));
+//	strncpy(strval, chtemp, len-(chtemp-strbuff)-2);
+	strncpy(strval, chtemp+2, strlen(chtemp));
+	trim(strval);
+	fclose(pfile);
+	strncpy(strver, strval, strlen(strval));
+	return 0;
+
+ERR_FAIL:
+	sprintf(strver, "%s", defval);
+	fclose(pfile);
+	return -1;
+}
+
+static int get_imgfile_version(const char *file, const char *defval, char *strver)
+{
+    nb_image_t headimage;
+    FILE *pfile = NULL;
+
+    if(file == NULL)
+    	goto ERR_FAIL;
+
+    pfile = fopen(file, "r");
+    if (pfile == NULL)
+    	goto ERR_FAIL;
+    if(fread(&headimage, sizeof(nb_image_t), 1, pfile) <=0 )
+    	goto ERR_FAIL;
+    fclose(pfile);
+    strncpy(strver, headimage.nbVersion, strlen(headimage.nbVersion));
+    return 0;
+
+ERR_FAIL:
+	sprintf(strver, "%s", defval);
+	if(pfile != NULL)
+		fclose(pfile);
+	return -1;
+}
+
+static int get_proc_file_str(const char *file, char *strval) {
+	char buff[32];
+	int ret;
+	FILE *pfile = NULL;
+
+	if(file == NULL)
+		return -1;
+
+	memset(buff, 0, sizeof(buff));
+	pfile = fopen(file, "r");
+	if(pfile == NULL) {
+		perror("open file failed");
+		return -1;
+	}
+	ret = fread(buff, sizeof(buff), 1, pfile);
+	if(ret < 0) {
+		fclose(pfile);
+		return -1;
+	}
+	strncpy(strval, buff, strlen(buff));
+	fclose(pfile);
+	return 0;
+}
+#endif
+
+#define D_CURVERSION_FILE		"/tmp/curversion"
+#define D_BACKUPVERSION_FILE	"/tmp/backupversion"
+#define D_FACTORYVERSION_FILE	"/usr/system/backup/nbos.stable"
+#define D_WLAN_CLIENT_COUNT_FILE   "/proc/sys/dev/wifi0/nb_sta_assoc"
+#define D_UPLINKTYPE_FILE			"/etc/uplinktype"
 void get_primary_ver(void* config_,char* string)
 {
- sprintf(string,"%s","NB11");
+#ifdef BUILD_MIPS
+	get_system_version(D_CURVERSION_FILE, "NBOS-1.0.0.0", string);
+#else
+	sprintf(string,"%s","NB11");
+#endif
 }
 //-------------------------------------------------------------------------------------------------
 
 void get_factory_ver(void* config_,char* string)
 {
- sprintf(string,"%s","NB12");
+#ifdef BUILD_MIPS
+	get_imgfile_version(D_FACTORYVERSION_FILE, "NBOS-1.0.0.0", string);
+#else
+	sprintf(string,"%s","NB12");
+#endif
 }
 //-------------------------------------------------------------------------------------------------
 
 void get_backup_ver(void* config_,char* string)
 {
- sprintf(string,"%s","NB13");
+#ifdef BUILD_MIPS
+	get_system_version(D_BACKUPVERSION_FILE, "NBBK-1.0.0.0", string);
+#else
+	sprintf(string,"%s","NB13");
+#endif
 }
 //-------------------------------------------------------------------------------------------------
 
 void get_uplinktype(void* config_,char* string)
 {
- sprintf(string,"%s","DHCP");
+#ifdef BUILD_MIPS
+	char buff[64] = {0};
+	if(get_proc_file_str(D_UPLINKTYPE_FILE, buff) < 0) {
+		strcpy(string, "UNKNOWN");
+		return ;
+	}
+	if(strncmp(buff, "UPLINK_DHCP_DISCOVER", strlen("UPLINK_DHCP_DISCOVER")) == 0)
+		strcpy(string, "DHCP");
+	else if(strncmp(buff, "UPLINK_PPPOE_DISCOVER", strlen("UPLINK_PPPOE_DISCOVER")) == 0)
+		strcpy(string, "PPPOE");
+	else if(strncmp(buff, "UPLINK_STATION", strlen("UPLINK_STATION")) == 0)
+		strcpy(string, "STATION");
+	else
+		strcpy(string, "UNKNOWN");
+#else
+	sprintf(string,"%s","DHCP");
+#endif
 }
 //-------------------------------------------------------------------------------------------------
 
 unsigned int get_ternum(void* config_)
 {
- return 5;
+#ifdef BUILD_MIPS
+	char buff[32] = {0};
+	get_proc_file_str(D_WLAN_CLIENT_COUNT_FILE, buff);
+	return atoi(buff);
+#else
+	return 5;
+#endif
 }
 //-------------------------------------------------------------------------------------------------

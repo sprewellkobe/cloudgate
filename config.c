@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "config.h"
 #include "common.h"
 //-------------------------------------------------------------------------------------------------
@@ -8,13 +9,18 @@ int load_config(Config* config,const char* filename)
  FILE* fp=fopen(filename,"r");
  if(fp==NULL)
     return -1;
- char* line = NULL;
- size_t len = 0;
- ssize_t read=0;
+// char* line = NULL;
+// size_t len = 0;
+// ssize_t read=0;
+ char line[128];
+ char *read = NULL;
+
  FileItem* fi=NULL;
  int fi_index=0;
  int be_string_index=-1; 
- while((read=getline(&line,&len,fp))!=-1)
+
+ memset(line, 0, sizeof(line));
+ while((read = fgets(line, sizeof(line), fp)) != NULL)
       {
        if(strlen(line)<=0||line[0]=='['||line[0]=='#')
           continue;
@@ -69,13 +75,14 @@ int load_config(Config* config,const char* filename)
           {
            strcpy(fi->trigger_unix_socket,value);
           }
+       memset(line, 0, sizeof(line));
       }//end while
  if(fi)
    {
     config->file_items[fi_index++]=*fi;
     free(fi);
    }
- if(line) free(line);
+// if(line) free(line);
  config->file_item_count=fi_index;
  return 1;
 }
