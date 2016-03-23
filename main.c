@@ -129,14 +129,19 @@ int check_config_build_post_data(Config* config,char* mac_string,char* md5_strin
 
  //added
  char temp[64];
+ memset(temp, 0, sizeof(temp));
  get_wtp_ip(config,temp);
  cJSON_AddStringToObject(root,"wtp_ip",temp);
+ memset(temp, 0, sizeof(temp));
  get_primary_ver(config,temp);
  cJSON_AddStringToObject(root,"primary_ver",temp);
+ memset(temp, 0, sizeof(temp));
  get_factory_ver(config,temp);
  cJSON_AddStringToObject(root,"factory_ver",temp);
+ memset(temp, 0, sizeof(temp));
  get_backup_ver(config,temp);
  cJSON_AddStringToObject(root,"backup_ver",temp);
+ memset(temp, 0, sizeof(temp));
  get_uplinktype(config,temp);
  cJSON_AddStringToObject(root,"uplinktype",temp);
  cJSON_AddNumberToObject(root,"ternum",get_ternum(config));

@@ -5,6 +5,7 @@
 #include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <net/if.h>
+#include <arpa/inet.h>
 #include <sys/un.h> 
 #include <sys/sysinfo.h>
 #include <errno.h>
@@ -381,8 +382,8 @@ int send_message_to_unix_socket(char* socket_name,char* message,size_t length)
 static int get_system_version(const char *file, const char *defval, char *strver)
 {
 	FILE *pfile = NULL;
-	char strbuff[64], strval[32];
-	char *chtemp = NULL;
+	char strbuff[64];
+	char *chtemp = NULL, *chptr = NULL;
 	int len;
 
 	pfile = fopen(file, "r");
@@ -399,11 +400,15 @@ static int get_system_version(const char *file, const char *defval, char *strver
 	if(chtemp == NULL) {
 		goto ERR_FAIL;
 	}
-	memset(strval, 0, sizeof(strval));
-	strncpy(strval, chtemp+2, strlen(chtemp));
-	trim(strval);
+	while(*chtemp == ':' || *chtemp == ' ')
+		chtemp++;
+	chptr = chtemp + strlen(chtemp) - 1;
+	while(*chptr == '\n' || *chptr == ' ') {
+		*chptr = '\0';
+		chptr--;
+	}
 	fclose(pfile);
-	strncpy(strver, strval, strlen(strval));
+	strncpy(strver, chtemp, strlen(chtemp));
 	return 0;
 
 ERR_FAIL:
@@ -486,10 +491,10 @@ int get_net_ip(char *eth, char *ipaddr)
 }
 #endif
 
-#define D_CURVERSION_FILE		"/tmp/curversion"
-#define D_BACKUPVERSION_FILE	"/tmp/backupversion"
-#define D_FACTORYVERSION_FILE	"/usr/system/backup/nbos.stable"
-#define D_WLAN_CLIENT_COUNT_FILE   "/proc/sys/dev/wifi0/nb_sta_assoc"
+#define D_CURVERSION_FILE			"/tmp/curversion"
+#define D_BACKUPVERSION_FILE		"/tmp/backupversion"
+#define D_FACTORYVERSION_FILE		"/usr/system/backup/nbos.stable"
+#define D_WLAN_CLIENT_COUNT_FILE	"/proc/sys/dev/wifi0/nb_sta_assoc"
 #define D_UPLINKTYPE_FILE			"/etc/uplinktype"
 
 void get_wtp_ip(void* config_, char* ipstr)
